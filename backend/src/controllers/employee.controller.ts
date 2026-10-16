@@ -17,7 +17,7 @@ export async function createEmployee(req: Request, res: Response) {
   if (existing) throw new HttpError(409, "An account with this email already exists");
 
   const employee = await prisma.user.create({
-    data: { name: data.name, email: data.email, passwordHash: await bcrypt.hash(data.password, 12), role: "EMPLOYEE", emailVerified: true, accountStatus: "ACTIVE" },
+    data: { name: data.name, email: data.email, passwordHash: await bcrypt.hash(data.password, 12), mustChangePassword: true, role: "EMPLOYEE", emailVerified: true, accountStatus: "ACTIVE" },
     select: employeeSelect
   });
   res.status(201).json({ employee });

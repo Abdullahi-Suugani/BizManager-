@@ -1,6 +1,7 @@
 import type { ErrorRequestHandler } from "express";
 import { ZodError } from "zod";
 import { HttpError } from "../utils/httpError.js";
+import { Prisma } from "@prisma/client";
 
 export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
   if (error instanceof ZodError) {
@@ -10,6 +11,11 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
 
   if (error instanceof HttpError) {
     res.status(error.statusCode).json({ message: error.message });
+    return;
+  }
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    res.status(409).json({ message: "An account with this email already exists. Please sign in or resend verification." });
     return;
   }
 

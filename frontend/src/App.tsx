@@ -12,6 +12,7 @@ import { TransactionsPage } from "./pages/TransactionsPage";
 import { AppShell } from "./components/AppShell";
 import { ReportsPage } from "./pages/ReportsPage";
 import { useLocation } from "react-router-dom";
+import { ChangePasswordPage } from "./pages/ChangePasswordPage";
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/change-password" element={<ChangePasswordPage />} />
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
         <Route path="/transactions/new" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
         <Route path="/transactions" element={<ShellRoute><TransactionsPage /></ShellRoute>} />
@@ -42,6 +44,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!user) {
     return <Navigate to="/login" replace />;
   }
+  if (user.mustChangePassword) return <Navigate to="/change-password" replace />;
 
   return children;
 }

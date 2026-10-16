@@ -14,7 +14,7 @@ export const app = express();
 
 app.use(
   cors({
-    origin: env.FRONTEND_URL,
+    origin: [env.FRONTEND_URL, ...env.ALLOWED_ORIGINS.split(",").map((value) => value.trim()).filter(Boolean)],
     credentials: true
   })
 );

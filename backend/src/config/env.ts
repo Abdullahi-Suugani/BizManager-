@@ -13,6 +13,7 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(16),
   PORT: z.coerce.number().int().positive().default(4000),
   FRONTEND_URL: z.string().url().default("http://localhost:5173"),
+  ALLOWED_ORIGINS: z.string().default(""),
   RESEND_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: emailFromSchema,
   EMAIL_VERIFICATION_REQUIRED: booleanEnv,
@@ -24,9 +25,12 @@ if (!result.success) throw new Error(`Invalid backend environment configuration.
 if (result.data.EMAIL_VERIFICATION_REQUIRED && !result.data.RESEND_API_KEY) throw new Error("Invalid backend environment configuration. Check: RESEND_API_KEY");
 export const env = result.data;
 
-// Supabase's transaction pooler requires an explicit TLS mode on Windows.
-// Normalize only the connection options; credentials and the database target
-// remain exactly as configured by the operator.
-if (!process.env.DATABASE_URL?.toLowerCase().includes("sslmode=")) {
-  process.env.DATABASE_URL = `${process.env.DATABASE_URL}${process.env.DATABASE_URL?.includes("?") ? "&" : "?"}sslmode=require`;
+// Supabase transaction pooler is the runtime path for this Windows environment.
+// Keep pgbouncer=true from the operator configuration and require TLS.
+function withRequiredTls(value: string | undefined) {
+  if (!value || value.toLowerCase().includes("sslmode=")) return value;
+  return `${value}${value.includes("?") ? "&" : "?"}sslmode=require`;
 }
+
+process.env.DATABASE_URL = withRequiredTls(process.env.DATABASE_URL);
+process.env.DIRECT_URL = withRequiredTls(process.env.DIRECT_URL);

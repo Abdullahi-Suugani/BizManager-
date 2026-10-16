@@ -18,6 +18,7 @@ model User {
   name         String
   email        String        @unique
   passwordHash String
+  mustChangePassword Boolean @default(false)
   role         Role          @default(EMPLOYEE)
   emailVerified Boolean       @default(false)
   accountStatus AccountStatus @default(PENDING)

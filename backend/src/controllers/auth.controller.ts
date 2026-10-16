@@ -4,17 +4,18 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
 import { prisma } from "../config/prisma.js";
 import { loginSchema } from "../validators/auth.validator.js";
-import { registerSchema, resendSchema, verifySchema } from "../validators/auth.validator.js";
+import { registerSchema, resendSchema, verifySchema, changePasswordSchema } from "../validators/auth.validator.js";
 import { HttpError } from "../utils/httpError.js";
 import crypto from "node:crypto";
 import { sendVerificationEmail } from "../services/email.service.js";
 
-function publicUser(user: { id: string; name: string; email: string; role: string }) {
+function publicUser(user: { id: string; name: string; email: string; role: string; mustChangePassword?: boolean }) {
   return {
     id: user.id,
     name: user.name,
     email: user.email,
-    role: user.role
+    role: user.role,
+    mustChangePassword: user.mustChangePassword ?? false
   };
 }
 
@@ -52,7 +53,13 @@ export async function register(req: Request, res: Response) {
     }
     throw new HttpError(409, "An account with this email already exists. Please sign in instead.");
   }
-  const user = await prisma.user.create({ data: { name: data.name, email: data.email, passwordHash: await bcrypt.hash(data.password, 12), role: "EMPLOYEE", accountStatus: env.EMAIL_VERIFICATION_REQUIRED ? "PENDING" : "ACTIVE", emailVerified: !env.EMAIL_VERIFICATION_REQUIRED } });
+  let user;
+  try {
+    user = await prisma.user.create({ data: { name: data.name, email: data.email, passwordHash: await bcrypt.hash(data.password, 12), role: "EMPLOYEE", accountStatus: env.EMAIL_VERIFICATION_REQUIRED ? "PENDING" : "ACTIVE", emailVerified: !env.EMAIL_VERIFICATION_REQUIRED } });
+  } catch (error: any) {
+    if (error?.code === "P2002") throw new HttpError(409, "An account with this email already exists. Please sign in or resend verification.");
+    throw error;
+  }
   if (!env.EMAIL_VERIFICATION_REQUIRED) {
     res.status(201).json({ message: "Account created. You can now log in." });
     return;
@@ -61,6 +68,15 @@ export async function register(req: Request, res: Response) {
   await prisma.emailVerificationToken.create({ data: { userId: user.id, tokenHash: crypto.createHash("sha256").update(rawToken).digest("hex"), expiresAt: new Date(Date.now() + env.VERIFICATION_TOKEN_TTL_MINUTES * 60_000) } });
   await sendVerificationEmail(user.email, user.name, rawToken);
   res.status(201).json({ message: "Account created. Check your email to verify your address." });
+}
+
+export async function changePassword(req: Request, res: Response) {
+  const data = changePasswordSchema.parse(req.body);
+  const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+  if (!user || user.accountStatus !== "ACTIVE") throw new HttpError(401, "You are not authenticated");
+  if (!(await bcrypt.compare(data.currentPassword, user.passwordHash))) throw new HttpError(400, "Current password is incorrect");
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await bcrypt.hash(data.newPassword, 12), mustChangePassword: false } });
+  res.json({ message: "Password changed successfully. Please sign in again." });
 }
 
 export async function verifyEmail(req: Request, res: Response) {
@@ -85,7 +101,8 @@ export async function resendVerification(req: Request, res: Response) {
 }
 
 export async function me(req: Request, res: Response) {
-  res.json({ user: req.user });
+  const user = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { id: true, name: true, email: true, role: true, mustChangePassword: true } });
+  res.json({ user });
 }
 
 export async function logout(_req: Request, res: Response) {
