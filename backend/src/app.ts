@@ -8,6 +8,7 @@ import { reportRouter } from "./routes/report.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { productRouter } from "./routes/product.routes.js";
 import { settingsRouter } from "./routes/settings.routes.js";
+import { dashboardRouter } from "./routes/dashboard.routes.js";
 import { prisma } from "./config/prisma.js";
 
 export const app = express();
@@ -33,6 +34,7 @@ app.get("/health", async (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/dashboard", dashboardRouter);
 app.use("/api/transactions", transactionRouter);
 app.use("/api/employees", employeeRouter);
 app.use("/api/reports", reportRouter);

@@ -28,6 +28,7 @@ type Item = {
   price: number;
 };
 type CatalogProduct = { id: string; name: string; code: string; unitPrice: string | number; stockQuantity: string | number };
+type DashboardSummary = { salesTotal: number; transactionCount: number; activeProductCount: number; activeEmployeeCount: number };
 
 const navGroups = [
   { title: "Dashboard", items: [{ label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" }] },
@@ -63,11 +64,16 @@ export function DashboardPage() {
   const [items, setItems] = useState<Item[]>([{ product: "", qty: 1, price: 0 }]);
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
   const [catalogError, setCatalogError] = useState("");
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
 
   useEffect(() => {
     api.get<{ products: CatalogProduct[] }>("/products")
       .then((response) => setCatalog(response.data.products))
       .catch(() => setCatalogError("Product catalog unavailable; you can still enter items manually."));
+  }, []);
+
+  useEffect(() => {
+    api.get<DashboardSummary>("/dashboard/summary").then((response) => setSummary(response.data)).catch(() => undefined);
   }, []);
 
   const subtotal = useMemo(() => items.reduce((sum, item) => sum + item.qty * item.price, 0), [items]);
@@ -173,6 +179,12 @@ export function DashboardPage() {
         </header>
 
         <div className={`grid flex-1 gap-4 p-3 sm:p-4 ${workspaceGridClass}`}>
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 lg:col-span-2 xl:col-span-3">
+            <SummaryCard label="Sales total" value={summary ? `$${summary.salesTotal.toFixed(2)}` : "Loading…"} />
+            <SummaryCard label="Transactions" value={summary ? String(summary.transactionCount) : "Loading…"} />
+            <SummaryCard label="Active products" value={summary ? String(summary.activeProductCount) : "Loading…"} />
+            <SummaryCard label="Active employees" value={summary ? String(summary.activeEmployeeCount) : "Loading…"} />
+          </section>
           <section className="flex flex-col rounded-md border border-slate-200 bg-white shadow-sm">
             <div className="shrink-0 border-b border-slate-200 p-4">
               <h3 className="font-bold text-emerald-800">Customer Information</h3>
@@ -360,6 +372,10 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
       />
     </label>
   );
+}
+
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-2xl font-bold text-emerald-800">{value}</p></div>;
 }
 
 function InvoicePreview({

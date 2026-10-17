@@ -1,5 +1,10 @@
-import "dotenv/config";
+import dotenv from "dotenv";
 import { z } from "zod";
+
+// Allow the explicitly named uppercase PORT entry to win on Windows, where
+// environment variable names are case-insensitive and a legacy lowercase
+// `port` connection-detail entry may otherwise occupy the same slot.
+dotenv.config({ override: true });
 
 const emailFromSchema = z.string().trim().refine((value) => {
   if (z.string().email().safeParse(value).success) return true;

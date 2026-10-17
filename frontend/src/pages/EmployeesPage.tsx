@@ -7,6 +7,7 @@ type Employee = User & { emailVerified: boolean; accountStatus: "ACTIVE" | "PEND
 export function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [editing, setEditing] = useState<Employee | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -34,6 +35,15 @@ export function EmployeesPage() {
     } catch (requestError: any) { setError(requestError.response?.data?.message ?? "Unable to create employee."); }
   }
 
+  async function updateEmployee(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setError(""); setMessage("");
+    if (!editing) return;
+    try {
+      await api.patch(`/employees/${editing.id}`, { name: form.name, email: form.email, ...(form.password ? { password: form.password } : {}) });
+      setEditing(null); setForm({ name: "", email: "", password: "" }); setMessage("Employee updated."); await loadEmployees();
+    } catch (requestError: any) { setError(requestError.response?.data?.message ?? "Unable to update employee."); }
+  }
+
   async function toggleStatus(employee: Employee) {
     setError(""); setMessage("");
     try {
@@ -46,16 +56,17 @@ export function EmployeesPage() {
   return <main className="min-h-screen bg-[#f5f7f6] p-4 text-slate-950 sm:p-8">
     <section className="mx-auto max-w-5xl space-y-6">
       <div><h1 className="text-3xl font-bold text-emerald-800">Employees</h1><p className="mt-2 text-slate-600">Admin-only employee account management.</p></div>
-      <form onSubmit={createEmployee} className="grid gap-3 rounded-md border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-4">
+      <form onSubmit={editing ? updateEmployee : createEmployee} className="grid gap-3 rounded-md border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-4">
         <input required minLength={2} placeholder="Full name" className="h-11 rounded border px-3" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <input required type="email" placeholder="Email" className="h-11 rounded border px-3" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-        <input required minLength={8} type="password" placeholder="Temporary password" className="h-11 rounded border px-3" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-        <button className="h-11 rounded bg-emerald-700 font-semibold text-white">Create employee</button>
+        <input required={!editing} minLength={editing ? undefined : 8} type="password" placeholder={editing ? "New password (optional)" : "Temporary password"} className="h-11 rounded border px-3" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        <button className="h-11 rounded bg-emerald-700 font-semibold text-white">{editing ? "Save employee" : "Create employee"}</button>
+        {editing ? <button type="button" onClick={() => { setEditing(null); setForm({ name: "", email: "", password: "" }); }} className="h-11 rounded border font-semibold">Cancel edit</button> : null}
       </form>
       {message ? <p className="text-sm font-semibold text-emerald-700">{message}</p> : null}
       {error ? <p className="text-sm font-semibold text-red-600">{error}</p> : null}
       <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm">
-        {loading ? <p className="p-5 text-slate-600">Loading employees...</p> : <table className="w-full text-left text-sm"><thead className="bg-slate-100"><tr><th className="p-3">Name</th><th className="p-3">Email</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead><tbody>{employees.map((employee) => <tr key={employee.id} className="border-t"><td className="p-3">{employee.name}</td><td className="p-3">{employee.email}</td><td className="p-3">{employee.accountStatus}</td><td className="p-3"><button onClick={() => void toggleStatus(employee)} className="font-semibold text-emerald-700">{employee.accountStatus === "SUSPENDED" ? "Reactivate" : "Deactivate"}</button></td></tr>)}</tbody></table>}
+        {loading ? <p className="p-5 text-slate-600">Loading employees...</p> : <table className="w-full text-left text-sm"><thead className="bg-slate-100"><tr><th className="p-3">Name</th><th className="p-3">Email</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead><tbody>{employees.map((employee) => <tr key={employee.id} className="border-t"><td className="p-3">{employee.name}</td><td className="p-3">{employee.email}</td><td className="p-3">{employee.accountStatus}</td><td className="p-3"><button onClick={() => { setEditing(employee); setForm({ name: employee.name, email: employee.email, password: "" }); }} className="mr-4 font-semibold text-emerald-700">Edit</button><button onClick={() => void toggleStatus(employee)} className="font-semibold text-emerald-700">{employee.accountStatus === "SUSPENDED" ? "Reactivate" : "Suspend"}</button></td></tr>)}</tbody></table>}
       </div>
     </section>
   </main>;
