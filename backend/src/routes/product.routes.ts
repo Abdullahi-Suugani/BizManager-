@@ -1,10 +1,13 @@
 import { Router } from "express";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { createProduct, deactivateProduct, listProducts, updateProduct } from "../controllers/product.controller.js";
+import { createProduct, deactivateProduct, listProducts, updateProduct, receiveBatch, recordMovement, listInventory } from "../controllers/product.controller.js";
 export const productRouter = Router();
 productRouter.use(requireAuth);
 productRouter.get("/", asyncHandler(listProducts));
+productRouter.get("/inventory", asyncHandler(listInventory));
 productRouter.post("/", requireRole("ADMIN"), asyncHandler(createProduct));
+productRouter.post("/batches", requireRole("ADMIN"), asyncHandler(receiveBatch));
+productRouter.post("/movements", requireRole("ADMIN"), asyncHandler(recordMovement));
 productRouter.put("/:id", requireRole("ADMIN"), asyncHandler(updateProduct));
 productRouter.delete("/:id", requireRole("ADMIN"), asyncHandler(deactivateProduct));

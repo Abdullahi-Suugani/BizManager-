@@ -107,6 +107,7 @@ export function DashboardPage() {
   }
 
   async function saveInvoice() {
+    if (isSaving) return;
     setSaveMessage("");
     setSaveError("");
 
@@ -146,8 +147,8 @@ export function DashboardPage() {
       setSaveMessage(`Saved ${response.data.transaction.transactionNumber}`);
       setSavedTransactionNumber(response.data.transaction.transactionNumber);
       setShowPreview(true);
-    } catch {
-      setSaveError("Failed to save invoice");
+    } catch (error: any) {
+      setSaveError(error.response?.data?.message ?? "Failed to save invoice");
     } finally {
       setIsSaving(false);
     }

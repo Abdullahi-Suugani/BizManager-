@@ -14,26 +14,50 @@ export async function createTransaction(req: Request, res: Response) {
   }
 
   const data = createTransactionSchema.parse(req.body);
-  const calculatedItems = data.items.map((item) => ({
-    ...(item.productId ? { productId: item.productId } : {}),
-    itemName: item.itemName,
-    quantity: item.quantity,
-    unitPrice: item.unitPrice,
-    amount: money(item.quantity * item.unitPrice)
-  }));
-
-  const subtotal = money(calculatedItems.reduce((sum, item) => sum + item.amount, 0));
-  const discount = money(Math.min(data.discount, subtotal));
-  const discountedSubtotal = money(subtotal - discount);
-  const taxAmount = money(discountedSubtotal * (data.taxRate / 100));
-  const totalAmount = money(discountedSubtotal + taxAmount);
-
   const saved = await prisma.$transaction(async (tx) => {
+    const productIds = [...new Set(data.items.flatMap((item) => item.productId ? [item.productId] : []))];
+    const products = await tx.product.findMany({ where: { id: { in: productIds }, isActive: true } });
+    const productById = new Map(products.map((product) => [product.id, product]));
+    const requestedByProduct = new Map<string, number>();
     for (const item of data.items) {
       if (!item.productId) continue;
-      const updated = await tx.product.updateMany({ where: { id: item.productId, isActive: true, stockQuantity: { gte: item.quantity } }, data: { stockQuantity: { decrement: item.quantity } } });
-      if (!updated.count) throw new HttpError(409, `Insufficient stock or inactive product for ${item.itemName}`);
+      requestedByProduct.set(item.productId, (requestedByProduct.get(item.productId) ?? 0) + item.quantity);
+      if (!productById.has(item.productId)) throw new HttpError(409, `Inactive or missing product for ${item.itemName}`);
     }
+
+    const batches = await tx.productBatch.findMany({
+      where: { productId: { in: productIds }, remainingQuantity: { gt: 0 }, OR: [{ expirationDate: null }, { expirationDate: { gt: new Date() } }] },
+      orderBy: [{ expirationDate: { sort: "asc", nulls: "last" } }, { receivedDate: "asc" }]
+    });
+    const batchesByProduct = new Map<string, typeof batches>();
+    for (const batch of batches) batchesByProduct.set(batch.productId, [...(batchesByProduct.get(batch.productId) ?? []), batch]);
+
+    for (const [productId, requested] of requestedByProduct) {
+      const product = productById.get(productId)!;
+      if (Number(product.stockQuantity) < requested) throw new HttpError(409, `Insufficient stock for ${product.name}`);
+      const availableBatches = batchesByProduct.get(productId) ?? [];
+      if (product.trackExpiry && availableBatches.reduce((sum, batch) => sum + Number(batch.remainingQuantity), 0) < requested) throw new HttpError(409, `Insufficient non-expired batch stock for ${product.name}`);
+      let remaining = requested;
+      for (const batch of availableBatches) {
+        if (!remaining) break;
+        const used = Math.min(remaining, Number(batch.remainingQuantity));
+        await tx.productBatch.update({ where: { id: batch.id }, data: { remainingQuantity: { decrement: used } } });
+        await tx.stockMovement.create({ data: { productId, batchId: batch.id, type: "SOLD", quantity: used, createdBy: req.user!.id, reason: "Sale" } });
+        remaining -= used;
+      }
+      await tx.product.update({ where: { id: productId }, data: { stockQuantity: { decrement: requested } } });
+    }
+
+    const calculatedItems = data.items.map((item) => {
+      const unitPrice = item.productId ? Number(productById.get(item.productId)!.unitPrice) : item.unitPrice;
+      return { ...(item.productId ? { productId: item.productId } : {}), itemName: item.itemName, quantity: item.quantity, unitPrice, amount: money(item.quantity * unitPrice) };
+    });
+    const subtotal = money(calculatedItems.reduce((sum, item) => sum + item.amount, 0));
+    const discount = money(Math.min(data.discount, subtotal));
+    const discountedSubtotal = money(subtotal - discount);
+    const taxAmount = money(discountedSubtotal * (data.taxRate / 100));
+    const totalAmount = money(discountedSubtotal + taxAmount);
+
     let transactionNumber = `TRX-${String((await tx.transaction.count()) + 1).padStart(6, "0")}`;
     let suffix = 1;
 
@@ -64,7 +88,7 @@ export async function createTransaction(req: Request, res: Response) {
         items: true
       }
     });
-  });
+  }, { maxWait: 10000, timeout: 15000 });
 
   res.status(201).json({ transaction: saved });
 }
