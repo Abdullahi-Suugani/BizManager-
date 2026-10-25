@@ -1,6 +1,8 @@
-import { Menu } from "lucide-react";
+import { ChevronDown, Menu, User } from "lucide-react";
 import { MobileSidebar, Sidebar } from "../pages/DashboardPage";
+import { useAuth } from "../context/AuthContext";
 
 export function AppShell({ children, currentPath, isMenuOpen, onMenuOpen, onMenuClose }: { children: React.ReactNode; currentPath: string; isMenuOpen: boolean; onMenuOpen: () => void; onMenuClose: () => void }) {
-  return <main className="flex min-h-screen bg-[#f5f7f6] text-slate-950"><Sidebar currentPath={currentPath} /><MobileSidebar currentPath={currentPath} isOpen={isMenuOpen} onClose={onMenuClose} /><button onClick={onMenuOpen} className="fixed left-4 top-4 z-30 rounded-md bg-[#0d1c1e] p-2 text-white shadow lg:hidden" aria-label="Open menu"><Menu className="h-5 w-5" /></button>{children}</main>;
+  const { user, logout } = useAuth();
+  return <main className="app-shell bg-[#f5f7f6] text-slate-950"><Sidebar currentPath={currentPath} /><MobileSidebar currentPath={currentPath} isOpen={isMenuOpen} onClose={onMenuClose} /><button onClick={onMenuOpen} className="fixed left-4 top-4 z-30 rounded-md bg-[#0d1c1e] p-2 text-white shadow lg:hidden" aria-label="Open menu"><Menu className="h-5 w-5" /></button><section className="app-main"><header className="app-header"><h2 className="truncate text-lg font-bold text-emerald-800 sm:text-xl">BizManager</h2><button onClick={logout} className="flex items-center gap-3 rounded-md px-2 py-1 hover:bg-slate-100"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200"><User className="h-5 w-5" /></div><div className="hidden text-left sm:block"><p className="font-semibold">{user?.name ?? "User"}</p><p className="text-xs capitalize text-slate-500">{user?.role.toLowerCase()}</p></div><ChevronDown className="h-4 w-4" /></button></header><div className="app-content">{children}</div></section></main>;
 }

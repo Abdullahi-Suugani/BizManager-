@@ -22,14 +22,14 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/change-password" element={<ChangePasswordPage />} />
-        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-        <Route path="/transactions/new" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ShellRoute><DashboardPage /></ShellRoute>} />
+        <Route path="/transactions/new" element={<ShellRoute><DashboardPage /></ShellRoute>} />
         <Route path="/transactions" element={<ShellRoute><TransactionsPage /></ShellRoute>} />
         <Route path="/search" element={<ShellRoute><TransactionsPage search /></ShellRoute>} />
         <Route path="/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
         <Route path="/employees" element={<AdminShellRoute><EmployeesPage /></AdminShellRoute>} />
         <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
-        <Route path="/settings" element={<AdminShellRoute><SettingsPage /></AdminShellRoute>} />
+        <Route path="/settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AuthProvider>
@@ -62,7 +62,7 @@ function ShellRoute({ children }: { children: React.ReactNode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   if (!isReady) return <div className="flex min-h-screen items-center justify-center bg-[#f5f7f6] text-slate-600">Checking your session...</div>;
   if (!user) return <Navigate to="/login" replace />;
-  return <AppShell currentPath={location.pathname} isMenuOpen={isMenuOpen} onMenuOpen={() => setIsMenuOpen(true)} onMenuClose={() => setIsMenuOpen(false)}><div className="min-w-0 flex-1">{children}</div></AppShell>;
+  return <AppShell currentPath={location.pathname} isMenuOpen={isMenuOpen} onMenuOpen={() => setIsMenuOpen(true)} onMenuClose={() => setIsMenuOpen(false)}>{children}</AppShell>;
 }
 
 function AdminShellRoute({ children }: { children: React.ReactNode }) {

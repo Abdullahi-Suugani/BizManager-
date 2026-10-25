@@ -46,9 +46,7 @@ const navGroups = [
 ];
 
 export function DashboardPage() {
-  const { user, logout } = useAuth();
-  const location = useLocation();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user } = useAuth();
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -155,31 +153,8 @@ export function DashboardPage() {
   }
 
   return (
-    <main className="flex min-h-screen bg-[#f5f7f6] text-slate-950">
-      <Sidebar currentPath={location.pathname} />
-      <MobileSidebar currentPath={location.pathname} isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
-
-      <section className="flex min-h-screen min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-3 shadow-sm sm:px-5 lg:px-7">
-          <div className="flex min-w-0 items-center gap-3 sm:gap-7">
-            <button onClick={() => setIsMenuOpen(true)} className="rounded-md p-2 hover:bg-slate-100 lg:hidden" aria-label="Open menu">
-              <Menu className="h-6 w-6" />
-            </button>
-            <h2 className="truncate text-lg font-bold text-emerald-800 sm:text-xl">Create Invoice</h2>
-          </div>
-          <button onClick={logout} className="flex items-center gap-3 rounded-md px-2 py-1 hover:bg-slate-100">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-200">
-              <User className="h-6 w-6" />
-            </div>
-            <div className="hidden text-left sm:block">
-              <p className="font-semibold">{user?.name ?? "User"}</p>
-              <p className="text-xs capitalize text-slate-500">{user?.role.toLowerCase()}</p>
-            </div>
-            <ChevronDown className="h-4 w-4" />
-          </button>
-        </header>
-
-        <div className={`grid flex-1 gap-4 p-3 sm:p-4 ${workspaceGridClass}`}>
+    <section className="min-w-0 flex-1">
+    <div className={`grid min-h-full gap-4 p-3 sm:p-4 ${workspaceGridClass}`}>
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 lg:col-span-2 xl:col-span-3">
             <SummaryCard label="Sales total" value={summary ? `$${summary.salesTotal.toFixed(2)}` : "Loading…"} />
             <SummaryCard label="Transactions" value={summary ? String(summary.transactionCount) : "Loading…"} />
@@ -329,7 +304,6 @@ export function DashboardPage() {
           </aside>
         </div>
       </section>
-    </main>
   );
 }
 
@@ -486,7 +460,7 @@ function PreviewLine({ label, value }: { label: string; value: string }) {
 
 export function Sidebar({ currentPath }: { currentPath: string }) {
   return (
-    <aside className="hidden min-h-screen w-72 shrink-0 bg-[#0d1c1e] px-5 py-6 text-white lg:block">
+    <aside className="hidden h-full w-72 shrink-0 overflow-y-auto bg-[#0d1c1e] px-5 py-6 text-white lg:block">
       <SidebarContent currentPath={currentPath} />
     </aside>
   );
