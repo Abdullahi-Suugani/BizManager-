@@ -9,7 +9,7 @@ server.on("error", (error: NodeJS.ErrnoException) => {
   if (error.code === "EADDRINUSE") {
     console.error(`Cannot start API: port ${env.PORT} is already in use. Stop only the existing BizManager backend process or choose another PORT.`);
   } else {
-    console.error("API server failed to start", { code: error.code, message: error.message });
+    console.error("API server failed to start", { code: error.code });
   }
   process.exitCode = 1;
 });

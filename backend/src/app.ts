@@ -27,7 +27,7 @@ app.get("/health", async (_req, res) => {
     res.json({ status: "ok", service: "electronic-sales-api", database: "ok" });
   } catch (error) {
     console.error("Health database check failed", {
-      error: error instanceof Error ? { name: error.name, message: error.message } : "Unknown database error"
+      error: error instanceof Error ? error.name : "Unknown database error"
     });
     res.status(503).json({ status: "degraded", service: "electronic-sales-api", database: "unavailable" });
   }

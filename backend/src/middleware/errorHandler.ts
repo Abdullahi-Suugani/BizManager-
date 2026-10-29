@@ -22,7 +22,7 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
   console.error("Unhandled API error", {
     method: req.method,
     path: req.path,
-    error: error instanceof Error ? { name: error.name, message: error.message } : "Unknown error"
+    error: error instanceof Error ? error.name : "Unknown error"
   });
   res.status(500).json({ message: "Something went wrong" });
 };

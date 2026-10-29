@@ -17,12 +17,12 @@ export async function sendVerificationEmail(email: string, name: string, token: 
     });
 
     if (error) {
-      console.error("Verification email delivery failed", { name: error.name, message: error.message, statusCode: error.statusCode });
+      console.error("Verification email delivery failed", { name: error.name, statusCode: error.statusCode });
       throw new HttpError(503, "Account created, but the verification email could not be sent. Please try again later.");
     }
   } catch (error) {
     if (error instanceof HttpError) throw error;
-    console.error("Verification email delivery failed", { error: error instanceof Error ? error.message : "Unknown Resend error" });
+    console.error("Verification email delivery failed", { error: error instanceof Error ? error.name : "Unknown error" });
     throw new HttpError(503, "Account created, but the verification email could not be sent. Please try again later.");
   }
 }

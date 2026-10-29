@@ -18,8 +18,8 @@ async function main() {
   const password = process.env.ADMIN_RESET_PASSWORD;
   const confirmed = process.env.ADMIN_RESET_CONFIRM === "YES";
 
-  if (!email || !password || password.length < 12) {
-    throw new Error("Set ADMIN_RESET_EMAIL and ADMIN_RESET_PASSWORD (at least 12 characters).");
+  if (!email || (confirmed && (!password || password.length < 12))) {
+    throw new Error("Set ADMIN_RESET_EMAIL and, for a confirmed reset, ADMIN_RESET_PASSWORD (at least 12 characters).");
   }
 
   const admins = await prisma.user.findMany({
@@ -27,19 +27,29 @@ async function main() {
     select: { id: true, email: true, emailVerified: true, accountStatus: true }
   });
 
+  if (!confirmed) {
+    const admin = admins.length === 1 ? admins[0] : undefined;
+    console.log(JSON.stringify({
+      adminFound: Boolean(admin),
+      adminCount: admins.length,
+      emailMatchesRequested: admin?.email === email,
+      emailVerified: admin?.emailVerified,
+      accountStatus: admin?.accountStatus,
+      resetPerformed: false
+    }));
+    return;
+  }
+
+  if (!password || password.length < 12) {
+    throw new Error("A confirmed reset requires an Admin password of at least 12 characters.");
+  }
+
   if (admins.length === 0) throw new Error("No existing Admin account was found. No account was changed.");
   if (admins.length > 1) throw new Error("Multiple Admin accounts were found. No account was changed.");
 
   const admin = admins[0];
-  if (!confirmed) {
-    console.log(JSON.stringify({
-      adminFound: true,
-      emailMatchesRequested: admin.email === email,
-      emailVerified: admin.emailVerified,
-      accountStatus: admin.accountStatus,
-      resetPerformed: false
-    }));
-    return;
+  if (admin.email !== email) {
+    throw new Error("The requested email does not match the existing Admin account. No account was changed.");
   }
 
   const emailOwner = await prisma.user.findUnique({ where: { email }, select: { id: true } });
@@ -50,7 +60,6 @@ async function main() {
   await prisma.user.update({
     where: { id: admin.id },
     data: {
-      email,
       passwordHash: await bcrypt.hash(password, 12),
       emailVerified: true,
       accountStatus: "ACTIVE",
@@ -61,8 +70,8 @@ async function main() {
 }
 
 main()
-  .catch((error) => {
-    console.error(error instanceof Error ? error.message : "Admin reset failed.");
+  .catch(() => {
+    console.error("Admin reset failed. No credential or connection details were logged.");
     process.exitCode = 1;
   })
   .finally(() => prisma.$disconnect());
