@@ -9,7 +9,7 @@
 - Configure the production frontend URL in `FRONTEND_URL`.
 - Configure the production API URL as `VITE_API_URL` in the frontend environment.
 - Use a verified Resend sender domain in `EMAIL_FROM`.
-- Keep `EMAIL_VERIFICATION_REQUIRED=true` for customer accounts.
+- Keep `EMAIL_VERIFICATION_REQUIRED=true` to preserve verification for existing pending accounts.
 - Set strong, temporary seed credentials only if initial seeding is required, then rotate or remove them.
 
 ## 2. Database safety
@@ -54,14 +54,13 @@ Get-Process -Id <PID>
 1. Create or provision the first Admin account securely.
 2. Verify its email address.
 3. Confirm Admin access to Employees, Products, Reports, and Settings.
-4. Create employee accounts from Employees.
+4. Create employee accounts from Employees, then securely give each employee their temporary password.
 5. Never grant Admin by editing browser storage or frontend code.
 
 ## 5. Smoke test
 
-- Register a test employee using an email allowed by Resend.
-- Receive and open the verification email.
-- Log in and refresh the browser to test session restoration.
+- Create a test employee from Employees and securely record the temporary password.
+- Log in as that employee, change the temporary password when prompted, and refresh the browser to test session restoration.
 - Create an invoice with a manual line item.
 - Create an invoice using a catalog product and confirm stock decreases.
 - Open the saved invoice and verify its generated transaction number.
@@ -72,7 +71,7 @@ Get-Process -Id <PID>
 
 ## 6. Email delivery
 
-Resend testing senders may only deliver to the Resend account email. For a real customer, verify the sending domain and use an approved `EMAIL_FROM` address. If delivery fails after account creation, the account remains pending; use Login → Resend verification after correcting Resend configuration.
+Resend testing senders may only deliver to the Resend account email. For a real customer, verify the sending domain and use an approved `EMAIL_FROM` address. Existing accounts that are still pending verification can use Login → Resend verification after correcting Resend configuration.
 
 ## 7. Backup and rollback
 

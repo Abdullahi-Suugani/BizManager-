@@ -5,7 +5,6 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { ProductsPage } from "./pages/ProductsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { LoginPage } from "./pages/LoginPage";
-import { RegisterPage } from "./pages/RegisterPage";
 import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 import { EmployeesPage } from "./pages/EmployeesPage";
 import { TransactionsPage } from "./pages/TransactionsPage";
@@ -19,7 +18,6 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/change-password" element={<ChangePasswordPage />} />
         <Route path="/dashboard" element={<ShellRoute><DashboardPage /></ShellRoute>} />
@@ -62,6 +60,7 @@ function ShellRoute({ children }: { children: React.ReactNode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   if (!isReady) return <div className="flex min-h-screen items-center justify-center bg-[#f5f7f6] text-slate-600">Checking your session...</div>;
   if (!user) return <Navigate to="/login" replace />;
+  if (user.mustChangePassword) return <Navigate to="/change-password" replace />;
   return <AppShell currentPath={location.pathname} isMenuOpen={isMenuOpen} onMenuOpen={() => setIsMenuOpen(true)} onMenuClose={() => setIsMenuOpen(false)}>{children}</AppShell>;
 }
 

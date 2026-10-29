@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { LockKeyhole, ReceiptText } from "lucide-react";
-import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../services/api";
 
@@ -113,7 +112,6 @@ export function LoginPage() {
             Resend verification email
           </button>
           {resendMessage ? <p className="mt-3 text-center text-sm font-medium text-emerald-700">{resendMessage}</p> : null}
-          <p className="mt-5 text-center text-sm text-slate-600"><Link className="font-semibold text-emerald-700 hover:underline" to="/register">Don't have an account? Create Account</Link></p>
         </form>
       </section>
     </main>

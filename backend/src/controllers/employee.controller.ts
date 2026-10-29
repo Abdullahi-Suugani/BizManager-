@@ -40,7 +40,7 @@ export async function updateEmployee(req: Request, res: Response) {
       ...(data.name === undefined ? {} : { name: data.name }),
       ...(data.email === undefined ? {} : { email: data.email }),
       ...(data.accountStatus === undefined ? {} : { accountStatus: data.accountStatus }),
-      ...(data.password === undefined ? {} : { passwordHash: await bcrypt.hash(data.password, 12) })
+      ...(data.password === undefined ? {} : { passwordHash: await bcrypt.hash(data.password, 12), mustChangePassword: true })
     },
     select: employeeSelect
   });
