@@ -1,23 +1,63 @@
-node_modules
-dist
-.env
-.env.local
-coverage
+# Dependencies and generated build output
+node_modules/
+dist/
+coverage/
+.vite/
+.next/
+.turbo/
+.cache/
+build/
+*.tsbuildinfo
+
+# Local logs and temporary files
 *.log
-.env.example
+*.log.*
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
 
+# All environment files, including examples
+.env*
+**/.env*
 
-# Environment variables and secrets
-.env
-.env.*
-!.env.example
+# Credentials, keys, and private certificates
+**/credentials/
+**/secrets/
+**/credentials.json
+**/secrets.json
+**/*-service-account*.json
+**/id_rsa
+**/id_ed25519
+**/id_ecdsa
+**/id_dsa
+*.pem
+*.key
+*.p12
+*.pfx
+*.p7b
+*.p7c
+*.p8
+*.crt
+*.cer
+*.der
+*.jks
+*.keystore
 
-# Backend environment files
-backend/.env
-backend/.env.*
-!backend/.env.example
+# Local database files and backups
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.pgdump
+*.backup
+*.bak
+*.sql.gz
 
-# Frontend environment files
-frontend/.env
-frontend/.env.*
-!frontend/.env.example
+# Operating system files
+.DS_Store
+Thumbs.db
