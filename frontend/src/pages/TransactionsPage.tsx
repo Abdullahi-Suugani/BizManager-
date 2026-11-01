@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../services/api";
 import { InvoiceDocument, InvoicePrintHost, type InvoiceDocumentData } from "../components/InvoiceDocument";
+import { useAuth } from "../context/AuthContext";
+import { canAccess } from "../utils/permissions";
 
 type Item = { id: string; itemName: string; quantity: string | number; unitPrice: string | number; amount: string | number };
 type Transaction = {
@@ -21,6 +23,8 @@ type Transaction = {
 type InvoiceSettings = { logoData: string | null };
 
 export function TransactionsPage({ search = false }: { search?: boolean }) {
+  const { user } = useAuth();
+  const canEditInvoices = canAccess(user, "invoices.edit");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [invoiceNumber, setInvoiceNumber] = useState("");
@@ -118,7 +122,7 @@ export function TransactionsPage({ search = false }: { search?: boolean }) {
                 <p className="mt-1 break-words text-sm"><span className="text-slate-500">Items:</span> {transaction.items.map((entry) => entry.itemName).join(", ")}</p>
                 <div className="mt-2 flex gap-4 border-t pt-2">
                   <button onClick={() => setSelected(transaction)} className="min-h-11 font-semibold text-emerald-700">View invoice</button>
-                  <Link to={`/transactions/${transaction.id}/edit`} className="inline-flex min-h-11 items-center font-semibold text-emerald-700">Edit</Link>
+                  {canEditInvoices ? <Link to={`/transactions/${transaction.id}/edit`} className="inline-flex min-h-11 items-center font-semibold text-emerald-700">Edit</Link> : null}
                 </div>
               </article>
             ))}
@@ -137,7 +141,7 @@ export function TransactionsPage({ search = false }: { search?: boolean }) {
                   <td className="p-3 text-right">${Number(transaction.totalAmount).toFixed(2)}</td>
                   <td className="flex gap-3 p-3">
                     <button onClick={() => setSelected(transaction)} className="font-semibold text-emerald-700">View</button>
-                    <Link to={`/transactions/${transaction.id}/edit`} className="font-semibold text-emerald-700">Edit</Link>
+                    {canEditInvoices ? <Link to={`/transactions/${transaction.id}/edit`} className="font-semibold text-emerald-700">Edit</Link> : null}
                   </td>
                 </tr>
               ))}

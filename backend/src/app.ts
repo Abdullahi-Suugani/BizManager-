@@ -10,6 +10,8 @@ import { productRouter } from "./routes/product.routes.js";
 import { settingsRouter } from "./routes/settings.routes.js";
 import { dashboardRouter } from "./routes/dashboard.routes.js";
 import { prisma } from "./config/prisma.js";
+import { activityRouter } from "./routes/activity.routes.js";
+import { customerRouter } from "./routes/customer.routes.js";
 
 export const app = express();
 
@@ -41,6 +43,8 @@ app.use("/api/employees", employeeRouter);
 app.use("/api/reports", reportRouter);
 app.use("/api/products", productRouter);
 app.use("/api/settings", settingsRouter);
+app.use("/api/activity", activityRouter);
+app.use("/api/customers", customerRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ message: "Route not found" });

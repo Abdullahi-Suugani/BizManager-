@@ -13,6 +13,8 @@ import {
   Settings,
   Share2,
   Save,
+  ShieldCheck,
+  Warehouse,
   Trash2,
   User,
   Users,
@@ -20,6 +22,9 @@ import {
 } from "lucide-react";
 import { api } from "../services/api";
 import { InvoiceDocument, InvoicePrintHost, type InvoiceDocumentData } from "../components/InvoiceDocument";
+import { useAuth } from "../context/AuthContext";
+import { canAccess } from "../utils/permissions";
+import type { Permission } from "../types/auth";
 
 type Item = {
   product: string;
@@ -27,32 +32,40 @@ type Item = {
   qty: number;
   price: number;
 };
-type CatalogProduct = { id: string; name: string; code: string; unitPrice: string | number; stockQuantity: string | number };
+type CatalogProduct = { id: string; name: string; code: string; unitPrice: string | number; stockQuantity?: string | number };
+type DirectoryCustomer = { id: string; name: string; phone: string | null; address: string | null };
 type DashboardSummary = { salesTotal: number; transactionCount: number; activeProductCount: number; activeEmployeeCount: number };
 type InvoiceSettings = { logoData: string | null };
 const emptyItem = (): Item => ({ product: "", qty: 1, price: 0 });
 const roundMoney = (value: number) => Number(value.toFixed(2));
 
-const navGroups = [
+const navGroups: { title: string; items: { label: string; icon: typeof LayoutDashboard; path: string; permission?: Permission; adminsOnly?: boolean }[] }[] = [
   { title: "Dashboard", items: [{ label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" }] },
   {
     title: "Sales",
     items: [
-      { label: "New Invoice", icon: ReceiptText, path: "/transactions/new" },
-      { label: "Invoices", icon: FileText, path: "/transactions" },
-      { label: "Search Records", icon: Search, path: "/search" }
+      { label: "New Invoice", icon: ReceiptText, path: "/transactions/new", permission: "invoices.create" },
+      { label: "Invoices", icon: FileText, path: "/transactions", permission: "invoices.view" },
+      { label: "Search Records", icon: Search, path: "/search", permission: "invoices.view" }
     ]
   },
-  { title: "Inventory", items: [{ label: "Products", icon: Boxes, path: "/products" }] },
-  { title: "Management", items: [{ label: "Employees", icon: Users, path: "/employees" }, { label: "Reports", icon: BarChart3, path: "/reports" }] },
-  { title: "Settings", items: [{ label: "Settings", icon: Settings, path: "/settings" }] }
+  { title: "Inventory", items: [{ label: "Products", icon: Boxes, path: "/products", permission: "products.view" }, { label: "Inventory", icon: Warehouse, path: "/inventory", permission: "inventory.view" }, { label: "Customers", icon: Users, path: "/customers", permission: "customers.view" }] },
+  { title: "Management", items: [{ label: "Employees", icon: Users, path: "/employees", adminsOnly: true }, { label: "Activity Logs", icon: ShieldCheck, path: "/activity", adminsOnly: true }, { label: "Reports", icon: BarChart3, path: "/reports", permission: "reports.view" }] },
+  { title: "Settings", items: [{ label: "Settings", icon: Settings, path: "/settings", adminsOnly: true }] }
 ];
 
 export function DashboardPage() {
+  const { user } = useAuth();
+  const location = useLocation();
+  const canCreateInvoices = canAccess(user, "invoices.create");
   const { id: editId } = useParams();
   const [customerName, setCustomerName] = useState("");
+  const [customerId, setCustomerId] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [customers, setCustomers] = useState<DirectoryCustomer[]>([]);
+  const [customerError, setCustomerError] = useState("");
+  const canViewCustomers = canAccess(user, "customers.view");
   const [paidAmount, setPaidAmount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [showPreview, setShowPreview] = useState(false);
@@ -80,6 +93,13 @@ export function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    if (!canViewCustomers) return;
+    api.get<{ customers: DirectoryCustomer[] }>("/customers")
+      .then((response) => setCustomers(response.data.customers))
+      .catch(() => setCustomerError("Customer directory unavailable; you can still enter customer details manually."));
+  }, [canViewCustomers]);
+
+  useEffect(() => {
     api.get<{ settings: InvoiceSettings }>("/settings/invoice")
       .then((response) => setInvoiceSettings(response.data.settings))
       .catch(() => setSettingsError("Business invoice settings are unavailable."));
@@ -92,8 +112,13 @@ export function DashboardPage() {
   useEffect(() => {
     if (!editId) return;
     setIsLoadingEdit(true);
-    api.get<{ transaction: { transactionNumber: string; createdAt: string; customerName: string | null; customerPhone: string | null; customerAddress: string | null; isPaid: boolean; amountPaid?: string | number; totalAmount: string | number; paymentMethod: string; items: { productId: string | null; itemName: string; quantity: string | number; unitPrice: string | number }[] } }>(`/transactions/${editId}`)
+    api.get<{ transaction: { transactionNumber: string; createdAt: string; customerId: string | null; customerName: string | null; customerPhone: string | null; customerAddress: string | null; isPaid: boolean; amountPaid?: string | number; totalAmount: string | number; paymentMethod: string; items: { productId: string | null; itemName: string; quantity: string | number; unitPrice: string | number }[] } }>(`/transactions/${editId}`)
       .then(({ data: { transaction } }) => {
+        if (transaction.items.some((entry) => entry.productId) && !canAccess(user, "products.view")) {
+          setSaveError("Permission denied: products.view is required to edit this invoice because it contains catalog products.");
+          return;
+        }
+        setCustomerId(transaction.customerId ?? "");
         setCustomerName(transaction.customerName ?? "");
         setPhone(transaction.customerPhone ?? "");
         setAddress(transaction.customerAddress ?? "");
@@ -119,7 +144,7 @@ export function DashboardPage() {
       })
       .catch((requestError: any) => setSaveError(requestError.response?.data?.message ?? "Unable to load invoice for editing."))
       .finally(() => setIsLoadingEdit(false));
-  }, [editId]);
+  }, [editId, user]);
 
   useEffect(() => {
     const resetLogoOption = () => setShowBusinessLogo(false);
@@ -159,6 +184,14 @@ export function DashboardPage() {
     logoData: invoiceSettings.logoData,
     showBusinessLogo
   };
+  const summaryCards = [
+    ...(canAccess(user, "invoices.view") ? [
+      { label: "Sales total", value: summary ? `$${summary.salesTotal.toFixed(2)}` : "Loading…" },
+      { label: "Transactions", value: summary ? String(summary.transactionCount) : "Loading…" }
+    ] : []),
+    ...(canAccess(user, "products.view") ? [{ label: "Active products", value: summary ? String(summary.activeProductCount) : "Loading…" }] : []),
+    ...(user?.role === "ADMIN" || user?.role === "SUPER_ADMIN" ? [{ label: "Active employees", value: summary ? String(summary.activeEmployeeCount) : "Loading…" }] : [])
+  ];
 
   function setModeItems(mode: "manual" | "products", updater: (current: Item[]) => Item[]) {
     const setter = mode === "manual" ? setManualItems : setProductItems;
@@ -182,6 +215,15 @@ export function DashboardPage() {
     setModeItems("products", (current) => current.map((item, itemIndex) => itemIndex === index
       ? { ...item, productId: product?.id, product: product?.name ?? "", price: product ? Number(product.unitPrice) : 0 }
       : item));
+  }
+
+  function selectCustomer(customerId: string) {
+    setCustomerId(customerId);
+    const customer = customers.find((entry) => entry.id === customerId);
+    if (!customer) return;
+    setCustomerName(customer.name);
+    setPhone(customer.phone ?? "");
+    setAddress(customer.address ?? "");
   }
 
   function printInvoice() {
@@ -228,6 +270,7 @@ export function DashboardPage() {
         customerName,
         customerPhone: phone,
         customerAddress: address,
+        ...(canViewCustomers ? { customerId: customerId || null } : {}),
         isPaid: total > 0 && paidAmount >= total,
         amountPaid: roundMoney(paidAmount),
         paymentMethod,
@@ -247,21 +290,34 @@ export function DashboardPage() {
     }
   }
 
+  if (location.pathname === "/dashboard" && !canCreateInvoices) {
+    return <section className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-6xl space-y-5"><header><h1 className="text-2xl font-bold text-emerald-800 sm:text-3xl">Dashboard</h1><p className="mt-2 text-slate-600">Your business overview.</p></header>
+        {summaryCards.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{summaryCards.map((card) => <SummaryCard key={card.label} label={card.label} value={card.value} />)}</div> : <p className="rounded border bg-white p-5 text-slate-600">No dashboard features are assigned to your account yet.</p>}
+      </div>
+    </section>;
+  }
+
   return (
     <section className="min-w-0 flex-1">
     <div className={`grid min-h-full min-w-0 gap-4 p-3 sm:p-4 lg:p-6 ${workspaceGridClass}`}>
           <section className="col-span-full grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 min-[1440px]:grid-cols-4">
-            <SummaryCard label="Sales total" value={summary ? `$${summary.salesTotal.toFixed(2)}` : "Loading…"} />
-            <SummaryCard label="Transactions" value={summary ? String(summary.transactionCount) : "Loading…"} />
-            <SummaryCard label="Active products" value={summary ? String(summary.activeProductCount) : "Loading…"} />
-            <SummaryCard label="Active employees" value={summary ? String(summary.activeEmployeeCount) : "Loading…"} />
+            {summaryCards.map((card) => <SummaryCard key={card.label} label={card.label} value={card.value} />)}
           </section>
           <section className="flex min-w-0 flex-col rounded-md border border-slate-200 bg-white shadow-sm">
             <div className="shrink-0 border-b border-slate-200 p-4">
               <h3 className="font-bold text-emerald-800">Customer Information</h3>
-              <Field label="Customer Name" value={customerName} onChange={setCustomerName} required />
-              <Field label="Phone" value={phone} onChange={setPhone} />
-              <Field label="Address (Optional)" value={address} onChange={setAddress} />
+              {canViewCustomers ? <label className="mt-3 block text-sm font-medium text-slate-700">
+                Use saved customer
+                <select className="mt-1 h-11 w-full rounded border border-slate-300 bg-white px-3" value={customerId} onChange={(event) => selectCustomer(event.target.value)}>
+                  <option value="">Enter customer details manually</option>
+                  {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
+                </select>
+              </label> : null}
+              {customerError ? <p role="status" className="mt-2 text-sm text-amber-700">{customerError}</p> : null}
+              <Field label="Customer Name" value={customerName} onChange={(value) => { setCustomerName(value); setCustomerId(""); }} required />
+              <Field label="Phone" value={phone} onChange={(value) => { setPhone(value); setCustomerId(""); }} />
+              <Field label="Address (Optional)" value={address} onChange={(value) => { setAddress(value); setCustomerId(""); }} />
             </div>
 
             <div className="flex-1 border-b border-slate-200 p-4">
@@ -270,9 +326,9 @@ export function DashboardPage() {
                 <button type="button" aria-pressed={itemMode === "manual"} onClick={() => switchItemMode("manual")} className={`rounded-md px-4 py-2 text-sm font-semibold ${itemMode === "manual" ? "bg-emerald-700 text-white" : "border border-slate-300 text-slate-700"}`}>
                   Write Items Manually
                 </button>
-                <button type="button" aria-pressed={itemMode === "products"} onClick={() => switchItemMode("products")} className={`rounded-md px-4 py-2 text-sm font-semibold ${itemMode === "products" ? "bg-emerald-700 text-white" : "border border-slate-300 text-slate-700"}`}>
+                {canAccess(user, "products.view") ? <button type="button" aria-pressed={itemMode === "products"} onClick={() => switchItemMode("products")} className={`rounded-md px-4 py-2 text-sm font-semibold ${itemMode === "products" ? "bg-emerald-700 text-white" : "border border-slate-300 text-slate-700"}`}>
                   Select Existing Products
-                </button>
+                </button> : null}
               </div>
               <div className={`overflow-x-auto ${showPreview ? "hidden 2xl:block" : "hidden xl:block"}`}>
                 <table className="w-full min-w-[620px] text-sm">
@@ -296,7 +352,7 @@ export function DashboardPage() {
                           ) : (
                             <select aria-label={`Item ${index + 1} product`} className="h-11 w-full min-w-0 rounded border border-slate-200 bg-white px-2 py-1" value={item.productId ?? ""} onChange={(event) => selectProduct(index, event.target.value)}>
                               <option value="">Choose a product</option>
-                              {catalog.map((product) => <option key={product.id} value={product.id}>{product.name} ({Number(product.stockQuantity).toFixed(2)} in stock)</option>)}
+                              {catalog.map((product) => <option key={product.id} value={product.id}>{product.name}{canAccess(user, "inventory.view") ? ` (${Number(product.stockQuantity).toFixed(2)} in stock)` : ""}</option>)}
                             </select>
                           )}
                         </td>
@@ -333,7 +389,7 @@ export function DashboardPage() {
                       ) : (
                         <select aria-label={`Item ${index + 1} product`} className="mt-1 h-11 w-full min-w-0 rounded border border-slate-300 bg-white px-3" value={item.productId ?? ""} onChange={(event) => selectProduct(index, event.target.value)}>
                           <option value="">Choose a product</option>
-                          {catalog.map((product) => <option key={product.id} value={product.id}>{product.name} ({Number(product.stockQuantity).toFixed(2)} in stock)</option>)}
+                          {catalog.map((product) => <option key={product.id} value={product.id}>{product.name}{canAccess(user, "inventory.view") ? ` (${Number(product.stockQuantity).toFixed(2)} in stock)` : ""}</option>)}
                         </select>
                       )}
                     </label>
@@ -498,6 +554,14 @@ export function MobileSidebar({ currentPath, isOpen, onClose }: { currentPath: s
 }
 
 function SidebarContent({ currentPath, onNavigate }: { currentPath: string; onNavigate?: () => void }) {
+  const { user } = useAuth();
+  const visibleGroups = navGroups.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      if (item.adminsOnly) return user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+      return !item.permission || canAccess(user, item.permission);
+    })
+  })).filter((group) => group.items.length > 0);
   return (
     <>
       <div className="flex items-center gap-3">
@@ -510,7 +574,7 @@ function SidebarContent({ currentPath, onNavigate }: { currentPath: string; onNa
         </div>
       </div>
       <nav className="mt-8 space-y-6">
-        {navGroups.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.title}>
             <p className="mb-3 text-xs uppercase tracking-wide text-slate-500">{group.title}</p>
             <div className="space-y-1">

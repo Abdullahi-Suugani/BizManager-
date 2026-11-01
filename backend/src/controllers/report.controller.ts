@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { prisma } from "../config/prisma.js";
 import { reportQuerySchema } from "../validators/report.validator.js";
+import { isBusinessAdministrator } from "../security/permissions.js";
 
 function range(from?: string, to?: string) {
   const createdAt: { gte?: Date; lt?: Date } = {};
@@ -15,7 +16,7 @@ function range(from?: string, to?: string) {
 
 export async function getSalesReport(req: Request, res: Response) {
   const query = reportQuerySchema.parse(req.query);
-  const where = { ...(req.user?.role === "ADMIN" ? {} : { employeeId: req.user!.id }), ...(query.from || query.to ? { createdAt: range(query.from, query.to) } : {}) };
+  const where = { ...(req.user && isBusinessAdministrator(req.user.role) ? {} : { employeeId: req.user!.id }), ...(query.from || query.to ? { createdAt: range(query.from, query.to) } : {}) };
   const transactions = await prisma.transaction.findMany({ where, select: { totalAmount: true, employeeId: true, employee: { select: { id: true, name: true, email: true } } } });
   const byEmployee = new Map<string, { employeeId: string; name: string; email: string; transactionCount: number; salesTotal: number }>();
   let salesTotal = 0;

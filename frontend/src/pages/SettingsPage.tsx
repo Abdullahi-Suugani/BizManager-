@@ -127,7 +127,7 @@ export function SettingsPage() {
                 ))}
                 <p className="text-xs text-slate-500">The print dialog's Show Business Logo option starts off for each print, regardless of this saved preference.</p>
               </div>
-              {user?.role === "ADMIN" && <button className="min-h-11 w-full rounded bg-emerald-700 px-4 py-2 font-semibold text-white sm:w-auto">Save settings</button>}
+              {(user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") && <button className="min-h-11 w-full rounded bg-emerald-700 px-4 py-2 font-semibold text-white sm:w-auto">Save settings</button>}
               {message && <p className="text-emerald-700">{message}</p>}
               {error && <p className="text-red-600">{error}</p>}
             </form>

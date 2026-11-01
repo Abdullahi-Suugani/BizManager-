@@ -4,6 +4,7 @@ import { prisma } from "../config/prisma.js";
 import { createTransactionSchema } from "../validators/transaction.validator.js";
 import { HttpError } from "../utils/httpError.js";
 import { transactionQuerySchema } from "../validators/transaction-query.validator.js";
+import { hasPermission, isBusinessAdministrator } from "../security/permissions.js";
 
 function money(value: number) {
   return Number(value.toFixed(2));
@@ -157,6 +158,32 @@ function transactionFields(data: ReturnType<typeof createTransactionSchema.parse
   };
 }
 
+async function transactionCustomerFields(
+  tx: Prisma.TransactionClient,
+  req: Request,
+  data: ReturnType<typeof createTransactionSchema.parse>,
+  existingCustomerId?: string | null
+) {
+  if (data.customerId === undefined) return {};
+  if (data.customerId === null) {
+    if (existingCustomerId && !hasPermission(req.user!.role, req.user!.permissions, "customers.view")) {
+      throw new HttpError(403, "Permission denied: customers.view is required to unlink a customer");
+    }
+    return { customerId: null, customerName: data.customerName, customerPhone: data.customerPhone, customerAddress: data.customerAddress };
+  }
+  if (!hasPermission(req.user!.role, req.user!.permissions, "customers.view")) {
+    throw new HttpError(403, "Permission denied: customers.view is required to link a customer");
+  }
+  const customer = await tx.customer.findUnique({ where: { id: data.customerId } });
+  if (!customer) throw new HttpError(404, "Customer not found");
+  return {
+    customerId: customer.id,
+    customerName: customer.name,
+    customerPhone: customer.phone,
+    customerAddress: customer.address
+  };
+}
+
 const transactionInclude = {
   employee: { select: { id: true, name: true, email: true, role: true } },
   items: true
@@ -166,6 +193,9 @@ export async function createTransaction(req: Request, res: Response) {
   if (!req.user) throw new HttpError(401, "You are not authenticated");
 
   const data = createTransactionSchema.parse(req.body);
+  if (data.items.some((item) => item.productId) && !hasPermission(req.user.role, req.user.permissions, "products.view")) {
+    throw new HttpError(403, "Permission denied: products.view is required to use catalog products");
+  }
   const saved = await prisma.$transaction(async (tx) => {
     const { productById, calculatedItems } = await prepareItems(tx, data.items);
     const totals = calculateTotals(calculatedItems);
@@ -173,7 +203,8 @@ export async function createTransaction(req: Request, res: Response) {
       data: {
         transactionNumber: await nextTransactionNumber(tx),
         employeeId: req.user!.id,
-        ...transactionFields(data, totals)
+        ...transactionFields(data, totals),
+        ...await transactionCustomerFields(tx, req, data)
       }
     });
     await reserveInventory(tx, req.user!.id, transaction.id, data.items, productById);
@@ -191,10 +222,28 @@ export async function updateTransaction(req: Request, res: Response) {
   if (!req.user) throw new HttpError(401, "You are not authenticated");
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const data = createTransactionSchema.parse(req.body);
+  if (data.items.some((item) => item.productId) && !hasPermission(req.user.role, req.user.permissions, "products.view")) {
+    throw new HttpError(403, "Permission denied: products.view is required to use catalog products");
+  }
 
   const saved = await prisma.$transaction(async (tx) => {
     const existing = await tx.transaction.findFirst({ where: { id, ...accessFilter(req) }, include: { items: true } });
     if (!existing) throw new HttpError(404, "Invoice not found");
+    req.auditPreviousValues = {
+      transactionNumber: existing.transactionNumber,
+      totalAmount: Number(existing.totalAmount),
+      amountPaid: Number(existing.amountPaid),
+      isPaid: existing.isPaid,
+      paymentMethod: existing.paymentMethod,
+      items: existing.items.map((item) => ({
+        itemName: item.itemName,
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice),
+        amount: Number(item.amount),
+        productId: item.productId
+      }))
+    };
+    const customerFields = await transactionCustomerFields(tx, req, data, existing.customerId);
 
     if (existing.items.some((item) => item.productId)) {
       const trackedMovements = await tx.stockMovement.count({ where: { reference: id, type: { in: ["SOLD", "RETURNED"] } } });
@@ -211,6 +260,7 @@ export async function updateTransaction(req: Request, res: Response) {
       where: { id },
       data: {
         ...transactionFields(data, totals),
+        ...customerFields,
         items: { deleteMany: {}, create: calculatedItems }
       },
       include: transactionInclude
@@ -232,7 +282,7 @@ function dateRange(from?: string, to?: string) {
 }
 
 function accessFilter(req: Request) {
-  return req.user?.role === "ADMIN" ? {} : { employeeId: req.user!.id };
+  return req.user && isBusinessAdministrator(req.user.role) ? {} : { employeeId: req.user!.id };
 }
 
 export async function listTransactions(req: Request, res: Response) {
@@ -240,7 +290,7 @@ export async function listTransactions(req: Request, res: Response) {
   const where = {
     ...accessFilter(req),
     ...(query.invoiceNumber ? { transactionNumber: { contains: query.invoiceNumber, mode: "insensitive" as const } } : {}),
-    ...(query.employeeId && req.user?.role === "ADMIN" ? { employeeId: query.employeeId } : {}),
+    ...(query.employeeId && req.user && isBusinessAdministrator(req.user.role) ? { employeeId: query.employeeId } : {}),
     ...(query.item ? { items: { some: { itemName: { contains: query.item, mode: "insensitive" as const } } } } : {}),
     ...(query.from || query.to ? { createdAt: dateRange(query.from, query.to) } : {})
   };

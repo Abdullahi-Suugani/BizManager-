@@ -8,13 +8,15 @@ import { resendSchema, verifySchema, changePasswordSchema } from "../validators/
 import { HttpError } from "../utils/httpError.js";
 import crypto from "node:crypto";
 import { sendVerificationEmail } from "../services/email.service.js";
+import { recordActivity } from "../middleware/activityAudit.js";
 
-function publicUser(user: { id: string; name: string; email: string; role: string; mustChangePassword?: boolean }) {
+function publicUser(user: { id: string; name: string; email: string; role: string; permissions: string[]; mustChangePassword?: boolean }) {
   return {
     id: user.id,
     name: user.name,
     email: user.email,
     role: user.role,
+    permissions: user.permissions,
     mustChangePassword: user.mustChangePassword ?? false
   };
 }
@@ -24,19 +26,25 @@ export async function login(req: Request, res: Response) {
   const user = await prisma.user.findUnique({ where: { email: data.email } });
 
   if (!user) {
+    await recordActivity({ action: "LOGIN_FAILED", recordType: "AUTHENTICATION", description: "Login failed for an unknown account", success: false });
     throw new HttpError(401, "Invalid email or password");
   }
-  if (!user.emailVerified || user.accountStatus !== "ACTIVE") throw new HttpError(403, "Please verify your email and wait for account approval before logging in");
+  if (!user.emailVerified || user.accountStatus !== "ACTIVE") {
+    await recordActivity({ actor: { id: user.id, name: user.name, role: user.role }, action: "LOGIN_FAILED", recordType: "AUTHENTICATION", description: "Login denied because the account is not active and verified", success: false });
+    throw new HttpError(403, "Please verify your email and wait for account approval before logging in");
+  }
 
   const isValidPassword = await bcrypt.compare(data.password, user.passwordHash);
 
   if (!isValidPassword) {
+    await recordActivity({ actor: { id: user.id, name: user.name, role: user.role }, action: "LOGIN_FAILED", recordType: "AUTHENTICATION", description: "Login failed due to invalid credentials", success: false });
     throw new HttpError(401, "Invalid email or password");
   }
 
   const token = jwt.sign({ userId: user.id, role: user.role }, env.JWT_SECRET, {
     expiresIn: "8h"
   });
+  await recordActivity({ actor: { id: user.id, name: user.name, role: user.role }, action: "LOGIN", recordType: "AUTHENTICATION", description: "User logged in", success: true });
 
   res.json({
     token,
@@ -75,10 +83,10 @@ export async function resendVerification(req: Request, res: Response) {
 }
 
 export async function me(req: Request, res: Response) {
-  const user = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { id: true, name: true, email: true, role: true, mustChangePassword: true } });
+  const user = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { id: true, name: true, email: true, role: true, permissions: true, mustChangePassword: true } });
   res.json({ user });
 }
 
-export async function logout(_req: Request, res: Response) {
+export async function logout(req: Request, res: Response) {
   res.json({ message: "Logged out successfully" });
 }

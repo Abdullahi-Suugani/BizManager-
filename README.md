@@ -33,6 +33,9 @@ The application brings sales and inventory records into one PostgreSQL-backed sy
 - Role-based access checks in both the React application and Express API.
 - JWT bearer-token authentication; tokens expire after eight hours.
 - Admin-managed employee creation, editing, suspension, and reactivation.
+- Separate `SUPER_ADMIN` role; Super Admins and Admins have identical business access, while only Super Admins can create Admin accounts.
+- Employee feature permissions are assigned by an Admin or Super Admin and enforced by the API on every protected endpoint.
+- Read-only Activity Logs include successful and failed business mutations and authentication activity.
 - Employee accounts created by an Admin are active, email-verified, and required to change their temporary password at first login.
 - Password changes require the current password and enforce a 12-character minimum with uppercase, lowercase, numeric, and symbol characters.
 - Email verification and resend-verification API flows, with configurable Resend email delivery.
@@ -42,7 +45,7 @@ There is no public sign-up page or API endpoint in the current application.
 
 ### Dashboard
 
-The dashboard page displays sales total, transaction count, active product count, and active employee count. Sales totals and transaction counts are scoped to the signed-in employee unless the user is an Admin; product and employee counts are business-wide.
+The dashboard displays only the summaries allowed by the signed-in user's permissions. Employee sales and transaction counts are scoped to that employee. Admin and Super Admin summaries include business-wide figures.
 
 The dashboard API response also includes low-stock and out-of-stock counts, expiring and expired batch counts, and inventory value. These additional metrics are not currently displayed on the dashboard page.
 
@@ -64,17 +67,18 @@ Selecting a product preserves its product relationship and deducts stock. Manual
 
 ### Products and inventory
 
-- Admins can add, edit, search, and deactivate products in the Products page.
+- Users with product-management permission can add, edit, search, and deactivate products in the Products page.
 - Product fields in the data model include name, code, SKU, barcode, category, unit, selling price, cost price, stock quantity, minimum and target stock, and expiry tracking.
-- Authenticated users can view active products and inventory information.
-- Backend APIs support product batches, purchase receipts, stock movements, and inventory listings.
+- Product and inventory visibility are controlled separately. Users with inventory permission can view the Inventory page, receive stock batches, and record movements.
 - Product-based invoice sales record stock movements and reduce product stock. Expiry-tracked products are checked against available non-expired batches.
-
-The current frontend Products page does not expose the batch-receiving or manual stock-movement APIs as interactive workflows; these are API capabilities.
 
 ### Customer information
 
-Invoices capture customer name, phone, and address. These values are stored on each transaction as invoice details. There is no separate customer model, customer directory, or customer CRUD page.
+Invoices continue to store customer name, phone, and address as historical snapshots. Users with customer-view permission can select a saved customer while creating or editing an invoice; the selected customer details are copied into that invoice as a snapshot. Invoice entry remains available with manually typed customer details, and deleting a customer does not change saved invoice snapshots.
+
+### Activity Logs
+
+Admins and Super Admins can search and filter the read-only Activity Logs by user, role, action, and date range. The API records actor identity from the authenticated database user, action, record type and ID, timestamp, success/failure, and sanitized before/after fields where available. Passwords, tokens, and logo data are excluded.
 
 ### Reports
 
@@ -97,13 +101,13 @@ The following items should not be mistaken for completed application features:
 | Area | Current implementation |
 |---|---|
 | Purchases | Batch receipt and stock-movement API endpoints exist; no purchase-order or supplier purchase ledger UI exists. |
-| Customer management | Customer details are stored on invoices; there is no separate customer records module. |
+| Customer-to-invoice linking | New invoices can optionally link to a saved customer. Invoice details remain historical snapshots and do not change when the directory record is later edited or deleted. Existing invoices are not automatically linked to directory records. |
 | PDF export | There is no PDF-generation library or server-side PDF endpoint. “Download PDF” opens the browser print flow; the user can choose Save as PDF. |
 | Invoice sharing | A Share Invoice button is displayed, but it has no implemented action. |
-| Inventory workflows | Product stock is visible and editable in Products; batch receipt and movement APIs are not wired into the current page UI. |
+| Invoice deletion | There is no invoice deletion endpoint; the employee permission list includes a reserved delete capability but it does not enable deletion. |
 | Saved settings preferences | Business contact, logo, and payment display preferences are stored. The print templates use the per-print logo checkbox; the saved contact/payment visibility preferences are not applied by the templates. |
-| Admin role assignment | Employee management does not grant Admin permissions to employees. Admin provisioning is a separate protected script. |
-| Automated tests | No test script or test files are defined in the package manifests. |
+| Initial Super Admin | Existing Admin accounts remain unchanged. An owner must explicitly designate one existing Admin using the local bootstrap command described below. |
+| Automated tests | Focused permission-policy unit tests exist; API integration and browser end-to-end suites are not configured. |
 
 Invoice rows retain legacy discount and tax database columns for compatibility with existing records. New and updated invoices save those values as zero, and their totals are calculated directly from line items. Existing financial records are not rewritten.
 
@@ -111,20 +115,18 @@ Invoice rows retain legacy discount and tax database columns for compatibility w
 
 The API is authoritative for permissions; hiding a frontend control is not a substitute for server-side authorization.
 
-| Capability | Admin | Employee |
-|---|---:|---:|
-| View dashboard summary | Yes; all sales | Yes; own sales summary, with business-wide product/employee/inventory counts |
-| Create invoices | Yes | Yes |
-| List, search, view, and edit invoices | All employees' invoices | Own invoices only |
-| View products and inventory | Yes | Yes |
-| Create, edit, deactivate products | Yes | No |
-| Receive stock batches or record movements | Yes, through API | No |
-| View sales reports | All employees | Own sales |
-| Create, edit, suspend, and reactivate employee accounts | Yes | No |
-| View and update business settings | Yes | No |
-| Change own password | Yes | Yes |
+| Capability | Super Admin | Admin | Employee |
+|---|---:|---:|---:|
+| Business features, reports, settings, and all Activity Logs | Yes | Yes | Only assigned features; invoices/reports remain scoped to own records |
+| Create Admin accounts | Yes | No | No |
+| Manage employees and assign employee permissions | Yes | Yes | No |
+| Create/edit invoices, manage products/customers/inventory | Yes | Yes | Only assigned permissions |
+| Change another user's role or Super Admin privileges | Initial designation only | No | No |
+| Change own password | Yes | Yes | Yes |
 
-Employee creation currently sets the role to `EMPLOYEE`; the employee interface does not offer a role selector.
+Super Admin and Admin access is intentionally identical for business operations. The only ongoing difference is creating Admin accounts. Employee capabilities are the fixed permission keys shown in Employees: invoice view/create/edit/delete, product view/manage, customer view/manage, inventory view/manage, and report view. The delete-invoice permission is reserved because no invoice deletion endpoint is implemented.
+
+The migration assigns existing employees the baseline capabilities matching their prior access (invoice view/create/edit, product view, inventory view, and reports). Admin and Super Admin access is based on role and does not depend on the employee permission list.
 
 ## Technology stack
 
@@ -178,10 +180,12 @@ flowchart LR
 │   │   ├── middleware/       # Authentication, rate limits, and errors
 │   │   ├── routes/           # Express route definitions
 │   │   ├── services/         # Email delivery
+│   │   ├── security/         # Employee permission definitions and checks
 │   │   ├── utils/            # HTTP errors and async handlers
 │   │   ├── validators/       # Zod schemas
 │   │   ├── app.ts            # Express middleware and route mounting
 │   │   ├── provision-admin.ts
+│   │   ├── promote-super-admin.ts
 │   │   └── reset-admin.ts
 │   └── package.json
 ├── frontend/
@@ -258,7 +262,7 @@ npx prisma migrate deploy --schema .\backend\prisma\schema.prisma
 
 `migrate deploy` applies the checked-in migrations without resetting the database. For a brand-new database it creates the schema; for an existing database it applies pending additive migrations. Never use `prisma migrate reset` with business data.
 
-The Prisma datasource uses both `DATABASE_URL` and `DIRECT_URL`; configure both before generating or migrating. Current migrations cover initial accounts/transactions, verification, products/settings, invoice fields, password-change flags, inventory tracking, invoice/logo fields, and partial-payment tracking.
+The Prisma datasource uses both `DATABASE_URL` and `DIRECT_URL`; configure both before generating or migrating. Current migrations cover initial accounts/transactions, verification, products/settings, invoice fields, password-change flags, inventory tracking, invoice/logo fields, partial-payment tracking, employee permissions, Activity Logs, and customer records.
 
 ### 5. Provision the first Admin (only if needed)
 
@@ -277,7 +281,21 @@ Remove-Item Env:ADMIN_EMAIL, Env:ADMIN_PASSWORD, Env:ADMIN_NAME
 
 Run this only against the intended database. If an Admin already exists, sign in with that account instead.
 
-### 6. Start the application
+### 6. Designate the first Super Admin (explicit owner action)
+
+Existing Admin accounts are not promoted automatically. After the additive migration is applied, choose one existing Admin and run the following command against the intended local database. It changes only that account's role; its email, password, and other account data are preserved. The command refuses if a Super Admin already exists or the selected email is not an existing Admin.
+
+```powershell
+Set-Location .\backend
+$env:SUPER_ADMIN_EMAIL = Read-Host "Email of the existing Admin to designate"
+npx tsx .\src\promote-super-admin.ts
+Remove-Item Env:SUPER_ADMIN_EMAIL
+Set-Location ..
+```
+
+Do not run this against production without the business owner's approval.
+
+### 7. Start the application
 
 Run both services together from the repository root:
 
@@ -341,6 +359,7 @@ These are only read by the corresponding scripts and are not needed for normal a
 | `ADMIN_NAME` | `provision:admin` | Optional name for a new initial Admin. |
 | `ADMIN_EMAIL` | `provision:admin` | Email for the initial Admin; provisioning refuses if any Admin already exists. |
 | `ADMIN_PASSWORD` | `provision:admin` | Initial Admin password; minimum 12 characters. Never log or commit it. |
+| `SUPER_ADMIN_EMAIL` | `promote-super-admin.ts` | Exact email of one existing Admin to designate as the initial Super Admin. |
 | `ADMIN_RESET_EMAIL` | `reset:admin` | Existing Admin email that must match before a confirmed password reset. |
 | `ADMIN_RESET_PASSWORD` | `reset:admin` | New password for a confirmed reset; minimum 12 characters. |
 | `ADMIN_RESET_CONFIRM` | `reset:admin` | Must equal `YES` to perform the reset; without it, the script only prints a limited status preview. |
@@ -356,9 +375,11 @@ All primary IDs are Prisma-generated CUID strings unless noted. Monetary and qua
 
 | Model | Purpose and key relationships |
 |---|---|
-| `User` | Unique email, password hash, role, verification/account status, and password-change flag. One user can create many `Transaction` records and have many verification tokens. |
+| `User` | Unique email, password hash, role, employee permission list, verification/account status, and password-change flag. One user can create transactions, customers, and verification tokens. |
 | `EmailVerificationToken` | Stores a unique token hash, expiry and use timestamps; belongs to a `User` and is deleted if that user is deleted. |
-| `Transaction` | Unique transaction number, customer snapshot, total and amount paid, payment method/status, timestamps, and required employee relation. Employee deletion is restricted while transactions refer to the employee. |
+| `Transaction` | Unique transaction number, customer snapshot, optional customer-directory link, total and amount paid, payment method/status, timestamps, and required employee relation. Employee deletion is restricted while transactions refer to the employee. |
+| `Customer` | Customer contact record with creator and optional related invoices. Removing a customer nulls the optional relation and preserves invoice customer snapshots. |
+| `ActivityLog` | Append-only through the application API; stores actor snapshots, action, record reference, time, success status, and sanitized optional before/after JSON. No user foreign key is used so actor history remains if an account is later removed. |
 | `TransactionItem` | Invoice line with item name, quantity, unit price, amount, optional product relation, and transaction relation. Transaction deletion cascades to its items; product deletion sets the optional product link to null. |
 | `Product` | Unique product code, catalog attributes, prices, stock quantity, and expiry-tracking configuration. Related to invoice items, batches, and stock movements. |
 | `ProductBatch` | Received quantity, remaining quantity, cost, supplier, and optional expiry date. Belongs to a product; `(productId, batchNumber)` is unique. |
@@ -371,6 +392,9 @@ All primary IDs are Prisma-generated CUID strings unless noted. Monetary and qua
 erDiagram
     User ||--o{ Transaction : creates
     User ||--o{ EmailVerificationToken : receives
+    User ||--o{ Customer : creates
+    User ||--o{ ActivityLog : acts
+    Customer o|--o{ Transaction : "optional directory link"
     Transaction ||--o{ TransactionItem : contains
     Product o|--o{ TransactionItem : "optional catalog link"
     Product ||--o{ ProductBatch : has
@@ -385,11 +409,28 @@ erDiagram
         string currency
         string logoData
     }
+    Customer {
+        string id PK
+        string createdBy FK
+        string name
+        string phone
+    }
+    ActivityLog {
+        string id PK
+        string actorId
+        enum actorRole
+        string action
+        string recordType
+        string recordId
+        datetime occurredAt
+        boolean success
+    }
     User {
         string id PK
         string email UK
         string passwordHash
         enum role
+        string[] permissions
         enum accountStatus
     }
     Transaction {
@@ -439,7 +480,7 @@ erDiagram
 
 ## API documentation
 
-The API is mounted at `/api`. Except for login and email-verification operations, endpoints below require a JWT bearer authorization header. Admin-only endpoints additionally require the authenticated user's current database role to be `ADMIN`.
+The API is mounted at `/api`. Except for login and email-verification operations, endpoints below require a JWT bearer authorization header. Admin-only endpoints accept `ADMIN` and `SUPER_ADMIN`; employee endpoints also check the assigned permission on the server.
 
 ### Authentication and health
 
@@ -472,6 +513,7 @@ Login response:
     "name": "Employee",
     "email": "employee@example.com",
     "role": "EMPLOYEE",
+    "permissions": ["invoices.view", "invoices.create"],
     "mustChangePassword": true
   }
 }
@@ -492,8 +534,8 @@ Verification request bodies are `{"token":"<verification-token>"}` and `{"email"
 
 | Method and path | Access | Query | Response |
 |---|---|---|---|
-| `GET /api/dashboard/summary` | Authenticated | None | Sales total/count, active product/employee counts, stock/expiry counts, and inventory value. |
-| `GET /api/reports/sales` | Authenticated | Optional `from=YYYY-MM-DD`, `to=YYYY-MM-DD` | `from`, `to`, `transactionCount`, `salesTotal`, and `byEmployee[]`. |
+| `GET /api/dashboard/summary` | Authenticated | None | Summary fields are populated only when the user has the corresponding permission. |
+| `GET /api/reports/sales` | `reports.view` | Optional `from=YYYY-MM-DD`, `to=YYYY-MM-DD` | `from`, `to`, `transactionCount`, `salesTotal`, and `byEmployee[]`; employees see their own results. |
 
 Date ranges are inclusive. The end date must be on or after the start date.
 
@@ -501,12 +543,12 @@ Date ranges are inclusive. The end date must be on or after the start date.
 
 | Method and path | Access | Query/body | Response |
 |---|---|---|---|
-| `POST /api/transactions` | Authenticated | Customer/payment fields and at least one invoice item | `201` with `{ "transaction": ... }`. |
-| `GET /api/transactions` | Authenticated | Optional filters below | `{ "transactions": [...], "pagination": {...} }`. |
-| `GET /api/transactions/:id` | Authenticated; own invoice for Employee | Invoice ID | `{ "transaction": ... }`. |
-| `PUT /api/transactions/:id` | Authenticated; own invoice for Employee | Same item/customer body as create | Updated `{ "transaction": ... }`. |
+| `POST /api/transactions` | `invoices.create` | Customer/payment fields and at least one invoice item | `201` with `{ "transaction": ... }`. |
+| `GET /api/transactions` | `invoices.view` | Optional filters below | `{ "transactions": [...], "pagination": {...} }`. |
+| `GET /api/transactions/:id` | `invoices.view`; own invoice for Employee | Invoice ID | `{ "transaction": ... }`. |
+| `PUT /api/transactions/:id` | `invoices.edit`; own invoice for Employee | Same item/customer body as create | Updated `{ "transaction": ... }`. |
 
-List filters: `invoiceNumber`, `employeeId` (Admin only), `item`, `from`, `to`, `page`, and `pageSize` (1–100; defaults to page 1 and 20 rows).
+List filters: `invoiceNumber`, `employeeId` (Admin/Super Admin only), `item`, `from`, `to`, `page`, and `pageSize` (1–100; defaults to page 1 and 20 rows).
 
 Create/update request:
 
@@ -542,10 +584,11 @@ All employee endpoints require Admin authorization.
 
 | Method and path | Purpose |
 |---|---|
-| `GET /api/employees` | List employee accounts. |
-| `POST /api/employees` | Create an active employee; password is hashed and must be changed at first login. |
-| `PATCH /api/employees/:id` | Update name, email, password, or account status (`ACTIVE`/`SUSPENDED`). |
-| `POST /api/employees/:id/deactivate` | Suspend an employee account. |
+| `GET /api/employees` | Admin/Super Admin: list employee accounts and assigned permissions. |
+| `POST /api/employees` | Admin/Super Admin: create an active employee and assign permissions; password is hashed and must be changed at first login. |
+| `POST /api/employees/admins` | Super Admin only: create a separate Admin account. |
+| `PATCH /api/employees/:id` | Admin/Super Admin: update employee details, password, status, or permissions. Cannot edit Admin/Super Admin accounts or change roles. |
+| `POST /api/employees/:id/deactivate` | Admin/Super Admin: suspend an employee account. |
 
 Create request example:
 
@@ -553,7 +596,8 @@ Create request example:
 {
   "name": "New Employee",
   "email": "new.employee@example.com",
-  "password": "<temporary-password>"
+  "password": "<temporary-password>",
+  "permissions": ["invoices.view", "invoices.create", "products.view"]
 }
 ```
 
@@ -561,17 +605,27 @@ The response contains the employee record but never returns the password.
 
 ### Products and inventory
 
-All routes below require authentication. Product writes, batch receipts, and stock movements require Admin authorization.
+All routes below require authentication and the listed employee capability. Admins and Super Admins bypass employee capability checks.
 
 | Method and path | Purpose |
 |---|---|
-| `GET /api/products` | List/search products. Optional `search`, `includeInactive=true`, and `lowStock=true` query parameters. |
-| `POST /api/products` | Create a product. |
-| `PUT /api/products/:id` | Replace product fields using the product schema. |
-| `DELETE /api/products/:id` | Deactivate/archive a product; it is not hard-deleted. |
-| `GET /api/products/inventory` | Return active products, expiring batches, and recent movements; optional `days` query parameter (up to 365). |
-| `POST /api/products/batches` | Receive a product batch and increase stock. |
-| `POST /api/products/movements` | Record a return, damage, expiry, or adjustment stock movement. |
+| `GET /api/products` | `products.view`: list/search products. `includeInactive=true` requires product management; `lowStock=true` requires inventory view. |
+| `POST /api/products` | `products.manage`; setting positive initial stock also requires `inventory.manage`. |
+| `PUT /api/products/:id` | `products.manage`; changing stock additionally requires `inventory.manage`. |
+| `DELETE /api/products/:id` | `products.manage`: deactivate/archive a product; it is not hard-deleted. |
+| `GET /api/products/inventory` | `inventory.view`: return active products, expiring batches, and recent movements. |
+| `POST /api/products/batches` | `inventory.manage`: receive a product batch and increase stock. |
+| `POST /api/products/movements` | `inventory.manage`: record a return, damage, expiry, or adjustment stock movement. |
+
+### Customers and audit logs
+
+| Method and path | Access | Purpose |
+|---|---|---|
+| `GET /api/customers` | `customers.view` | List the customer directory and invoice counts. |
+| `POST /api/customers` | `customers.manage` | Create a customer contact record. |
+| `PUT /api/customers/:id` | `customers.manage` | Update customer details. |
+| `DELETE /api/customers/:id` | `customers.manage` | Delete the directory record; invoice snapshots are preserved. |
+| `GET /api/activity` | Admin/Super Admin | Read-only paginated Activity Logs; optional `search`, `role`, `action`, `from`, `to`, `page`, and `pageSize` filters. |
 
 Product create example:
 
@@ -590,9 +644,9 @@ Batch receipt requires `productId`, `batchNumber`, `receivedQuantity`, and `purc
 
 | Method and path | Access | Purpose |
 |---|---|---|
-| `GET /api/settings/invoice` | Authenticated | Return settings needed for invoice display, including business name, logo, contact fields, and currency. |
-| `GET /api/settings` | Admin | Return business settings. |
-| `PUT /api/settings` | Admin | Save business name/contact/currency/display preferences and optional logo data URI. |
+| `GET /api/settings/invoice` | `invoices.view` or `invoices.create` | Return settings needed for invoice display, including business name, logo, contact fields, and currency. |
+| `GET /api/settings` | Admin/Super Admin | Return business settings. |
+| `PUT /api/settings` | Admin/Super Admin | Save business name/contact/currency/display preferences and optional logo data URI. |
 
 The uploaded logo is stored as a PNG, JPEG, or WebP data URI. Keep request images within the 2 MB UI upload limit.
 
@@ -612,7 +666,7 @@ Common statuses:
 |---:|---|
 | `400` | Invalid request or validation failure. |
 | `401` | Missing, invalid, or expired authentication. |
-| `403` | Account is not verified/approved or lacks the required role. |
+| `403` | Account is not verified/approved or lacks the required role/permission. |
 | `404` | Route or requested invoice/product/employee was not found. |
 | `409` | Duplicate account/product, unavailable product, insufficient stock, or unsafe legacy invoice edit. |
 | `429` | Authentication/verification rate limit exceeded. |
@@ -623,37 +677,44 @@ Login is limited to 10 attempts per IP/path per 15 minutes; email verification t
 
 ## Using BizManager
 
-1. **Sign in.** Use the Admin account provisioned for your database or an employee account created by an Admin. Employees with temporary passwords must change them at first login.
-2. **Review the dashboard.** Check sales, transaction count, and active product/employee counts. Inventory and expiry counts are available in the dashboard API response but are not currently displayed in the page.
-3. **Create employee accounts (Admin).** Open Employees, enter a name/email and temporary password (or generate one), and share the temporary password securely. Employees must change it on first login.
-4. **Manage products (Admin).** Open Products to add/edit product name, code, price, and stock, search the catalog, and deactivate products.
-5. **Create an invoice.** Open New Invoice, enter customer details, and use either Write Items Manually or Select Existing Products. Enter quantities and manual prices or select catalog items. Total equals the sum of line amounts.
-6. **Save and preview.** Save the invoice to assign its transaction number, then open the preview. Saved invoices can be found through Invoices or Search Records.
-7. **Print or download.** Choose whether to show the business logo, then select Print Invoice or Download PDF. Download PDF opens the browser print dialog; select **Save as PDF** there.
-8. **Manage business information (Admin).** Open Settings to update business contact details, currency, logo, and saved preferences. The per-print logo checkbox starts off each print.
-9. **Review reports.** Open Reports, optionally set a date range, and review the sales total and per-employee results.
+1. **Sign in.** Use an existing Admin account, a separately provisioned Super Admin account, or an employee account created by an Admin. Employees with temporary passwords must change them at first login.
+2. **Review the dashboard.** Check the summary cards that your account permissions allow.
+3. **Create employee accounts (Admin/Super Admin).** Open Employees, enter a name/email and temporary password, assign only the required feature permissions, and share the temporary password securely. Employees must change it on first login.
+4. **Create Admin accounts (Super Admin only).** Use the Create Admin section in Employees. Each Admin should have a unique account; the Admin cannot create another Admin.
+5. **Manage products and stock.** Use Products for product details; use Inventory for stock receipts, movements, expiry information, and history. Actions require the matching employee permission.
+6. **Manage customers.** Open Customers to create, edit, view, or delete directory records. Invoice customer fields remain stored as historical snapshots.
+7. **Create an invoice.** Open New Invoice, enter customer details, and use either Write Items Manually or Select Existing Products. Enter quantities and manual prices or select catalog items. Total equals the sum of line amounts.
+8. **Save and preview.** Save the invoice to assign its transaction number, then open the preview. Saved invoices can be found through Invoices or Search Records.
+9. **Print or download.** Choose whether to show the business logo, then select Print Invoice or Download PDF. Download PDF opens the browser print dialog; select **Save as PDF** there.
+10. **Manage business information (Admin/Super Admin).** Open Settings to update business contact details, currency, logo, and saved preferences. The per-print logo checkbox starts off each print.
+11. **Review reports and activity (as allowed).** Reports are permission-gated. Admins and Super Admins can use Activity Logs to filter recorded actions and inspect safe record details.
 
 ## Security
 
 - Passwords are stored as bcrypt hashes (12 rounds); password values are not returned by the employee API.
 - Login uses signed JWT access tokens with an eight-hour expiry. The frontend stores the token in browser `localStorage` and attaches it as a bearer token.
-- The API looks up the current user and active account status on authenticated requests, then checks roles on Admin-only routes.
+- The API looks up the current user, active account status, role, and employee permissions from PostgreSQL on authenticated requests; it does not trust role or identity values supplied by the frontend.
+- Admin and Super Admin share business-management access. Only the Super Admin account-creation endpoint is more restricted.
+- Employees receive only assigned feature permissions. UI controls are hidden where practical, and Express enforces the same permissions for direct API requests.
+- Activity log reads are limited to Admin and Super Admin. The application exposes no Activity Log update/delete endpoints; mutation requests are audited before their responses are sent.
+- Activity snapshots use allowlisted fields and exclude passwords, bearer tokens, and logo data. Existing invoice customer data is retained as snapshots when a separate customer record is deleted.
 - Zod schemas validate authentication, invoice, product, employee, report, and settings input.
 - Email-verification tokens are generated with cryptographic randomness and stored as SHA-256 hashes with expirations.
 - CORS is restricted to `FRONTEND_URL` and explicit `ALLOWED_ORIGINS`.
 - Configure secrets only in local ignored environment files or a trusted deployment secret manager. Never expose backend secrets through `VITE_` variables.
 - Use TLS-protected PostgreSQL connections and least-privilege database credentials. Back up the database before production migrations.
-- Sharing an Admin password makes activity attribution less reliable and increases exposure risk. Prefer individual accounts; the current UI does not yet support granting Admin role to an employee.
+- Sharing credentials makes it impossible to reliably attribute actions to a specific person, weakens accountability, and increases the impact of a leaked password. The safer alternative is a separate account for each authorized person: a Super Admin can create multiple individual Admin accounts, each with its own password and audit history.
 
 ## Testing and troubleshooting
 
 ### Available checks
 
-No automated test runner or test files are currently defined in the workspace packages. The available project validation commands are:
+The backend has focused unit tests for the shared role/permission policy. The project does not currently have an API integration-test harness or configured browser end-to-end tests. Run the available check commands:
 
 ```powershell
 npm run build
 npx prisma validate --schema .\backend\prisma\schema.prisma
+npx tsx --test .\backend\src\security\permissions.test.ts
 ```
 
 For a local service smoke check after starting the API:
@@ -662,7 +723,7 @@ For a local service smoke check after starting the API:
 Invoke-RestMethod http://localhost:4000/health
 ```
 
-The health response should report `"database":"ok"`.
+The health response should report `"database":"ok"`. For full role and Activity Log verification, use a local development database after applying pending migrations; do not test by resetting or modifying production data.
 
 ### Common problems
 

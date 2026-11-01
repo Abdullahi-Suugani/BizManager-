@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { auditMutation } from "../middleware/activityAudit.js";
+import { requireAnyPermission } from "../security/permissions.js";
 import { getInvoiceSettings, getSettings, updateSettings } from "../controllers/settings.controller.js";
 export const settingsRouter = Router();
 settingsRouter.use(requireAuth);
-settingsRouter.get("/invoice", asyncHandler(getInvoiceSettings));
+settingsRouter.get("/invoice", requireAnyPermission("invoices.view", "invoices.create"), asyncHandler(getInvoiceSettings));
 settingsRouter.get("/", requireRole("ADMIN"), asyncHandler(getSettings));
-settingsRouter.put("/", requireRole("ADMIN"), asyncHandler(updateSettings));
+settingsRouter.put("/", auditMutation("BUSINESS_SETTINGS_UPDATED", "SETTINGS"), requireRole("ADMIN"), asyncHandler(updateSettings));

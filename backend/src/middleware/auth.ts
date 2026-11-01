@@ -18,6 +18,7 @@ declare global {
         name: string;
         email: string;
         role: Role;
+        permissions: string[];
       };
     }
   }
@@ -35,14 +36,14 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { id: true, name: true, email: true, role: true, accountStatus: true }
+      select: { id: true, name: true, email: true, role: true, permissions: true, accountStatus: true }
     });
 
     if (!user || user.accountStatus !== "ACTIVE") {
       throw new HttpError(401, "You are not authenticated");
     }
 
-    req.user = { id: user.id, name: user.name, email: user.email, role: user.role };
+    req.user = { id: user.id, name: user.name, email: user.email, role: user.role, permissions: user.permissions };
     next();
   } catch (error) {
     if (error instanceof HttpError) {
@@ -61,7 +62,11 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
 
 export function requireRole(...roles: Role[]) {
   return (req: Request, _res: Response, next: NextFunction) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    const roleMatches = req.user && (
+      roles.includes(req.user.role) ||
+      (roles.includes("ADMIN") && req.user.role === "SUPER_ADMIN")
+    );
+    if (!roleMatches) {
       next(new HttpError(403, "You are not authorized to perform this action"));
       return;
     }
