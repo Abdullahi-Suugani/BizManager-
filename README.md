@@ -52,7 +52,9 @@ The dashboard API response also includes low-stock and out-of-stock counts, expi
 - Add invoice lines by manually entering item names and prices, or by selecting an active catalog product.
 - Keep manual and catalog item drafts while switching entry methods.
 - Calculate each line amount, subtotal, and total from quantity and unit price. New and updated invoices have no discount or tax applied.
-- Save invoices with a transaction number, creator, payment status, and payment method.
+- Save invoices with a transaction number, creator, payment amount, and payment method. New and edited invoices support unpaid, partially paid, and fully paid balances.
+- Preserve existing paid/unpaid statuses when the additive payment migration backfills the new amount-paid field. Legacy paid invoices are initialized as fully paid and legacy unpaid invoices as zero paid; any historic partial payments cannot be inferred because the previous schema did not store their amounts.
+- Use a shared invoice layout for on-screen preview and browser printing, including A4 print styles and repeating item-table headers across pages.
 - View, search, filter, and edit saved invoices, subject to ownership and inventory-history checks.
 - Preview invoices and print the preview or saved invoice using the browser's print dialog.
 - Optionally include the business logo on a print operation; the per-print option starts off.
@@ -256,7 +258,7 @@ npx prisma migrate deploy --schema .\backend\prisma\schema.prisma
 
 `migrate deploy` applies the checked-in migrations without resetting the database. For a brand-new database it creates the schema; for an existing database it applies pending additive migrations. Never use `prisma migrate reset` with business data.
 
-The Prisma datasource uses both `DATABASE_URL` and `DIRECT_URL`; configure both before generating or migrating. Current migrations cover initial accounts/transactions, verification, products/settings, invoice fields, password-change flags, inventory tracking, and invoice/logo fields.
+The Prisma datasource uses both `DATABASE_URL` and `DIRECT_URL`; configure both before generating or migrating. Current migrations cover initial accounts/transactions, verification, products/settings, invoice fields, password-change flags, inventory tracking, invoice/logo fields, and partial-payment tracking.
 
 ### 5. Provision the first Admin (only if needed)
 
@@ -356,7 +358,7 @@ All primary IDs are Prisma-generated CUID strings unless noted. Monetary and qua
 |---|---|
 | `User` | Unique email, password hash, role, verification/account status, and password-change flag. One user can create many `Transaction` records and have many verification tokens. |
 | `EmailVerificationToken` | Stores a unique token hash, expiry and use timestamps; belongs to a `User` and is deleted if that user is deleted. |
-| `Transaction` | Unique transaction number, customer snapshot, total/payment fields, timestamps, and required employee relation. Employee deletion is restricted while transactions refer to the employee. |
+| `Transaction` | Unique transaction number, customer snapshot, total and amount paid, payment method/status, timestamps, and required employee relation. Employee deletion is restricted while transactions refer to the employee. |
 | `TransactionItem` | Invoice line with item name, quantity, unit price, amount, optional product relation, and transaction relation. Transaction deletion cascades to its items; product deletion sets the optional product link to null. |
 | `Product` | Unique product code, catalog attributes, prices, stock quantity, and expiry-tracking configuration. Related to invoice items, batches, and stock movements. |
 | `ProductBatch` | Received quantity, remaining quantity, cost, supplier, and optional expiry date. Belongs to a product; `(productId, batchNumber)` is unique. |
@@ -395,6 +397,7 @@ erDiagram
         string transactionNumber UK
         string employeeId FK
         decimal totalAmount
+        decimal amountPaid
         string customerName
     }
     TransactionItem {
@@ -513,6 +516,7 @@ Create/update request:
   "customerPhone": "+1 555 0100",
   "customerAddress": "Example address",
   "isPaid": false,
+  "amountPaid": 25,
   "paymentMethod": "Cash",
   "items": [
     {
@@ -530,7 +534,7 @@ Create/update request:
 }
 ```
 
-For a catalog item, the API verifies the active product and uses its stored name and price; stock is checked and deducted. Manual lines omit `productId`. The API calculates each line amount and total from saved item lines. Legacy discount and tax fields are retained in the database, but new and updated invoices store zero values for them. An older product invoice without invoice-linked stock history cannot be edited safely and returns `409`.
+For a catalog item, the API verifies the active product and uses its stored name and price; stock is checked and deducted. Manual lines omit `productId`. The API calculates each line amount and total from saved item lines. `amountPaid` is optional for older clients; when omitted, `isPaid: true` means the full total was paid and `false` means zero was paid. When provided, it must not exceed the invoice total, and the server derives `isPaid` from the saved amount. Legacy discount and tax fields are retained in the database, but new and updated invoices store zero values for them. An older product invoice without invoice-linked stock history cannot be edited safely and returns `409`.
 
 ### Employees
 

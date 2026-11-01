@@ -47,8 +47,8 @@ export function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen bg-[#eef3f0]">
-      <section className="hidden min-h-screen w-[42%] bg-[#0d1c1e] px-14 py-12 text-white lg:block">
+    <main className="flex min-h-[100svh] min-w-0 bg-[#eef3f0]">
+      <section className="hidden min-h-screen w-[42%] bg-[#0d1c1e] px-10 py-12 text-white xl:block 2xl:px-14">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-600">
             <ReceiptText className="h-6 w-6" />
@@ -67,8 +67,8 @@ export function LoginPage() {
         </div>
       </section>
 
-      <section className="flex min-h-screen flex-1 items-center justify-center px-5">
-        <form onSubmit={handleSubmit} className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-xl">
+      <section className="flex min-h-[100svh] min-w-0 flex-1 items-center justify-center px-4 py-6 sm:px-6">
+        <form onSubmit={handleSubmit} className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-xl sm:p-8">
           <div className="mb-8">
             <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
               <LockKeyhole className="h-6 w-6" />
@@ -86,6 +86,8 @@ export function LoginPage() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             type="email"
+            autoComplete="email"
+            required
           />
 
           <label className="mt-5 block text-sm font-medium text-slate-700" htmlFor="password">
@@ -97,12 +99,14 @@ export function LoginPage() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             type="password"
+            autoComplete="current-password"
+            required
           />
 
           {error ? <p className="mt-4 text-sm font-medium text-red-600">{error}</p> : null}
 
           <button
-            className="mt-7 h-11 w-full rounded-md bg-emerald-700 font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+            className="mt-7 min-h-11 w-full rounded-md bg-emerald-700 font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400"
             disabled={isLoading}
             type="submit"
           >

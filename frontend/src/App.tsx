@@ -66,7 +66,8 @@ function ShellRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AdminShellRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, isReady } = useAuth();
+  if (!isReady) return <div className="flex min-h-screen items-center justify-center bg-[#f5f7f6] text-slate-600">Checking your session...</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== "ADMIN") return <Navigate to="/dashboard" replace />;
   return <ShellRoute>{children}</ShellRoute>;

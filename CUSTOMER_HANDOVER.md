@@ -67,7 +67,7 @@ To inspect an existing Admin without changing it, set `ADMIN_RESET_EMAIL` to its
 - Log in as that employee, change the temporary password when prompted, and refresh the browser to test session restoration.
 - Create an invoice with manual item names and multiple lines; switch to product selection and back to verify neither draft is lost.
 - Create an invoice using a catalog product and confirm stock decreases; edit the new invoice and confirm stock adjustments are reversed and re-applied.
-- Open the saved invoice and verify its generated transaction number, line descriptions, and totals.
+- Open the saved invoice and verify its generated transaction number, item names, payment summary, and totals.
 - Print once with Show Business Logo off and once with it on; confirm the logo option resets after each print.
 - Search invoices and apply date filters.
 - Open Reports and confirm totals are based on saved transactions.
@@ -88,7 +88,9 @@ Resend testing senders may only deliver to the Resend account email. For a real 
 
 ## 8. Invoice persistence status
 
-The invoice form persists customer contact, discount, tax, payment status, and payment method fields on `Transaction`. Migration `20261015010000_add_transaction_invoice_fields` added those fields. The additive migration `20261101000000_add_invoice_descriptions_and_business_logo` adds an optional uploaded business logo; deploy it with the Prisma commands in section 2 before running this application version. It does not reset or replace existing records. No description field is shown or used for new invoice entries.
+The invoice form persists customer contact, payment amount, payment status, and payment method fields on `Transaction`. Migration `20261015010000_add_transaction_invoice_fields` added the original invoice fields. The additive migration `20261101000000_add_invoice_descriptions_and_business_logo` adds an optional uploaded business logo; migration `20261101010000_add_transaction_amount_paid` adds partial-payment tracking and backfills existing paid invoices to their full total while unpaid invoices remain at zero. Any historic partial payments cannot be inferred because the previous schema did not store their amounts. Deploy pending migrations with the Prisma commands in section 2 before running this application version. The migrations do not reset or delete existing records. No description field is shown or used for new invoice entries.
+
+The invoice preview and print/PDF flow use the same template. The print output uses A4 styling, hides the application UI, and supports multi-page item tables. Choose **Save as PDF** in the browser print dialog to save a PDF.
 
 Invoice edits created after this update are linked to their stock movements so inventory can be safely restored and re-applied. Older product invoices lack that link and are intentionally rejected for editing rather than risking incorrect stock counts; older manual-only invoices can still be edited.
 

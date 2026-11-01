@@ -138,15 +138,21 @@ async function nextTransactionNumber(tx: Prisma.TransactionClient) {
 }
 
 function transactionFields(data: ReturnType<typeof createTransactionSchema.parse>, totals: ReturnType<typeof calculateTotals>) {
+  const amountPaid = money(data.amountPaid ?? (data.isPaid ? totals.totalAmount : 0));
+  if (amountPaid > totals.totalAmount) {
+    throw new HttpError(400, "Paid amount cannot exceed invoice total");
+  }
+
   return {
     totalAmount: totals.totalAmount,
+    amountPaid,
     customerName: data.customerName,
     customerPhone: data.customerPhone,
     customerAddress: data.customerAddress,
     discount: 0,
     taxRate: 0,
     taxAmount: 0,
-    isPaid: data.isPaid,
+    isPaid: totals.totalAmount > 0 && amountPaid >= totals.totalAmount,
     paymentMethod: data.paymentMethod
   };
 }

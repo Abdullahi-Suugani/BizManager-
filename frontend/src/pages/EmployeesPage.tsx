@@ -59,24 +59,57 @@ export function EmployeesPage() {
     } catch (requestError: any) { setError(requestError.response?.data?.message ?? "Unable to update employee."); }
   }
 
-  return <main className="min-h-screen bg-[#f5f7f6] p-4 text-slate-950 sm:p-8">
-    <section className="mx-auto max-w-5xl space-y-6">
-      <div><h1 className="text-3xl font-bold text-emerald-800">Employees</h1><p className="mt-2 text-slate-600">Create accounts as Admin. Share temporary passwords securely; employees must change them at first login.</p></div>
-      <form onSubmit={editing ? updateEmployee : createEmployee} className="grid gap-3 rounded-md border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-4">
-        <input required minLength={2} placeholder="Full name" className="h-11 rounded border px-3" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        <input required type="email" placeholder="Email" className="h-11 rounded border px-3" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+  return <section className="min-w-0 bg-[#f5f7f6] p-3 text-slate-950 sm:p-6 lg:p-8">
+    <div className="mx-auto max-w-5xl space-y-6">
+      <div><h1 className="text-2xl font-bold text-emerald-800 sm:text-3xl">Employees</h1><p className="mt-2 text-slate-600">Create accounts as Admin. Share temporary passwords securely; employees must change them at first login.</p></div>
+      <form onSubmit={editing ? updateEmployee : createEmployee} className="grid min-w-0 gap-3 rounded-md border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 xl:grid-cols-4 sm:p-5">
+        <input required minLength={2} aria-label="Full name" placeholder="Full name" className="h-11 min-w-0 rounded border px-3" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        <input required type="email" aria-label="Email" placeholder="Email" className="h-11 min-w-0 rounded border px-3" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         <div className="relative">
-          <input required={!editing} minLength={editing ? undefined : 8} type="password" placeholder={editing ? "New password (optional)" : "Temporary password"} className="h-11 w-full rounded border px-3 pr-24" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-          {!editing ? <button type="button" aria-label="Generate temporary password" onClick={generateTemporaryPassword} className="absolute right-2 top-1/2 -translate-y-1/2 text-sm font-semibold text-emerald-700">Generate</button> : null}
+          <input required={!editing} minLength={editing ? undefined : 8} type="password" aria-label={editing ? "New password (optional)" : "Temporary password"} placeholder={editing ? "New password (optional)" : "Temporary password"} className="h-11 w-full min-w-0 rounded border px-3 pr-24" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          {!editing ? <button type="button" aria-label="Generate temporary password" onClick={generateTemporaryPassword} className="absolute right-2 top-1/2 min-h-11 -translate-y-1/2 px-2 text-sm font-semibold text-emerald-700">Generate</button> : null}
         </div>
-        <button className="h-11 rounded bg-emerald-700 font-semibold text-white">{editing ? "Save employee" : "Create employee"}</button>
-        {editing ? <button type="button" onClick={() => { setEditing(null); setForm({ name: "", email: "", password: "" }); }} className="h-11 rounded border font-semibold">Cancel edit</button> : null}
+        <div className="flex gap-2">
+          <button className="min-h-11 flex-1 rounded bg-emerald-700 px-3 font-semibold text-white">{editing ? "Save employee" : "Create employee"}</button>
+          {editing ? <button type="button" onClick={() => { setEditing(null); setForm({ name: "", email: "", password: "" }); }} className="min-h-11 rounded border px-3 font-semibold">Cancel</button> : null}
+        </div>
       </form>
       {message ? <p className="text-sm font-semibold text-emerald-700">{message}</p> : null}
       {error ? <p className="text-sm font-semibold text-red-600">{error}</p> : null}
-      <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm">
-        {loading ? <p className="p-5 text-slate-600">Loading employees...</p> : <table className="w-full text-left text-sm"><thead className="bg-slate-100"><tr><th className="p-3">Name</th><th className="p-3">Email</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead><tbody>{employees.map((employee) => <tr key={employee.id} className="border-t"><td className="p-3">{employee.name}</td><td className="p-3">{employee.email}</td><td className="p-3">{employee.accountStatus}</td><td className="p-3"><button onClick={() => { setEditing(employee); setForm({ name: employee.name, email: employee.email, password: "" }); }} className="mr-4 font-semibold text-emerald-700">Edit</button><button onClick={() => void toggleStatus(employee)} className="font-semibold text-emerald-700">{employee.accountStatus === "SUSPENDED" ? "Reactivate" : "Suspend"}</button></td></tr>)}</tbody></table>}
+      <div className="rounded-md border border-slate-200 bg-white shadow-sm">
+        {loading ? <p className="p-5 text-slate-600">Loading employees...</p> : (
+          <>
+            <div className="grid gap-3 p-3 md:hidden">
+              {employees.map((employee) => (
+                <article key={employee.id} className="min-w-0 rounded border p-3">
+                  <h2 className="break-words font-semibold">{employee.name}</h2>
+                  <p className="break-all text-sm text-slate-600">{employee.email}</p>
+                  <p className="mt-2 text-sm">Status: <span className="font-medium">{employee.accountStatus}</span></p>
+                  <div className="mt-2 flex flex-wrap gap-3 border-t pt-2">
+                    <button onClick={() => { setEditing(employee); setForm({ name: employee.name, email: employee.email, password: "" }); }} className="min-h-11 font-semibold text-emerald-700">Edit</button>
+                    <button onClick={() => void toggleStatus(employee)} className="min-h-11 font-semibold text-emerald-700">{employee.accountStatus === "SUSPENDED" ? "Reactivate" : "Suspend"}</button>
+                  </div>
+                </article>
+              ))}
+              {employees.length === 0 ? <p className="p-2 text-slate-600">No employees found.</p> : null}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[640px] text-left text-sm">
+                <thead className="bg-slate-100"><tr><th className="p-3">Name</th><th className="p-3">Email</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead>
+                <tbody>{employees.map((employee) => (
+                  <tr key={employee.id} className="border-t">
+                    <td className="p-3">{employee.name}</td><td className="p-3">{employee.email}</td><td className="p-3">{employee.accountStatus}</td>
+                    <td className="p-3"><div className="flex gap-4">
+                      <button onClick={() => { setEditing(employee); setForm({ name: employee.name, email: employee.email, password: "" }); }} className="font-semibold text-emerald-700">Edit</button>
+                      <button onClick={() => void toggleStatus(employee)} className="font-semibold text-emerald-700">{employee.accountStatus === "SUSPENDED" ? "Reactivate" : "Suspend"}</button>
+                    </div></td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
-    </section>
-  </main>;
+    </div>
+  </section>;
 }

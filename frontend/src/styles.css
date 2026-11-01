@@ -5,6 +5,8 @@
 html,
 body,
 #root {
+  min-width: 320px;
+  min-height: 100%;
   height: 100%;
 }
 
@@ -12,13 +14,14 @@ body {
   margin: 0;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
-.app-shell { display: flex; height: 100dvh; min-height: 0; overflow: hidden; }
+.app-shell { display: flex; width: 100%; height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
 .app-main { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; }
-.app-header { display: flex; height: 4rem; flex-shrink: 0; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; background: white; padding: 0.75rem 1rem; box-shadow: 0 1px 2px rgb(15 23 42 / 0.06); }
-.app-content { min-height: 0; flex: 1; overflow-y: auto; overflow-x: hidden; }
+.app-header { display: flex; min-height: 4rem; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 0.75rem; border-bottom: 1px solid #e2e8f0; background: white; padding: 0.5rem max(0.75rem, env(safe-area-inset-right)) 0.5rem max(0.75rem, env(safe-area-inset-left)); box-shadow: 0 1px 2px rgb(15 23 42 / 0.06); }
+.app-content { min-width: 0; min-height: 0; flex: 1; overflow-y: auto; overflow-x: hidden; padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 @media (min-width: 1024px) { .app-header { padding-inline: 1.75rem; } }
 
 @page {
@@ -26,39 +29,383 @@ body {
   margin: 14mm;
 }
 
+@media (max-width: 560px) {
+  .invoice-document {
+    padding: 20px;
+  }
+
+  .invoice-title-row {
+    gap: 8px;
+  }
+
+  .invoice-title-row h1 {
+    font-size: clamp(1.7rem, 8vw, 2.4rem);
+  }
+
+  .invoice-title-row p {
+    max-width: 52%;
+    font-size: 0.82rem;
+  }
+
+  .invoice-customer-info {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .invoice-billed-to {
+    padding-right: 0;
+  }
+
+  .invoice-meta {
+    padding: 16px 0 0;
+    border-top: 1px solid #999;
+    border-left: 0;
+  }
+
+  .invoice-meta p {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .invoice-items-table th,
+  .invoice-items-table td {
+    padding: 8px 3px;
+    font-size: 0.72rem;
+  }
+
+  .invoice-items-table .invoice-number-column {
+    width: 6%;
+  }
+
+  .invoice-items-table .invoice-quantity-column {
+    width: 12%;
+  }
+
+  .invoice-items-table .invoice-money-column {
+    width: 24%;
+  }
+}
+
+.invoice-document {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 28px;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  background: #fff;
+  color: #111;
+  font-family: Arial, Helvetica, sans-serif;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.08);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.invoice-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 30px;
+}
+
+.invoice-title-row h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+.invoice-title-row p {
+  margin: 8px 0 0;
+  text-align: right;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.invoice-title-underline {
+  display: block;
+  width: 76px;
+  height: 3px;
+  margin-top: 12px;
+  background: #111;
+}
+
+.invoice-customer-info {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  margin: 8px 0 28px;
+}
+
+.invoice-billed-to {
+  padding-right: 28px;
+  overflow-wrap: anywhere;
+}
+
+.invoice-billed-to h2 {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.invoice-billed-to p {
+  margin: 4px 0;
+  line-height: 1.4;
+}
+
+.invoice-meta {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 4px 0 4px 28px;
+  border-left: 1px solid #999;
+}
+
+.invoice-meta p {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.invoice-payment-method {
+  justify-self: start;
+  padding: 3px 12px;
+  border-radius: 8px;
+  background: #eee;
+}
+
+.invoice-logo {
+  max-width: 112px;
+  max-height: 52px;
+  object-fit: contain;
+}
+
+.invoice-items-wrap {
+  overflow: hidden;
+  border: 1px solid #d6d6d6;
+  border-radius: 10px;
+}
+
+.invoice-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.95rem;
+}
+
+.invoice-items-table th,
+.invoice-items-table td {
+  padding: 11px 12px;
+  text-align: left;
+}
+
+.invoice-items-table thead {
+  background: #ededed;
+}
+
+.invoice-items-table th {
+  font-weight: 700;
+}
+
+.invoice-items-table tbody tr + tr td {
+  border-top: 1px solid #e5e5e5;
+}
+
+.invoice-items-table .invoice-number-column {
+  width: 8%;
+}
+
+.invoice-items-table .invoice-quantity-column {
+  width: 12%;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.invoice-items-table .invoice-money-column {
+  width: 18%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.invoice-item-name {
+  overflow-wrap: anywhere;
+}
+
+.invoice-payment-summary {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 400px);
+  margin: 24px 0 0 auto;
+}
+
+.invoice-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 32px;
+  padding: 4px 12px;
+}
+
+.invoice-summary-row > :last-child {
+  text-align: right;
+}
+
+.invoice-total-row {
+  min-height: 42px;
+  border-radius: 9px;
+  background: #e8e8e8;
+  font-size: 1.15rem;
+}
+
+.invoice-balance-row {
+  min-height: 44px;
+  border-radius: 9px;
+  background: #151515;
+  color: #fff;
+  font-size: 1.05rem;
+}
+
+.invoice-thank-you {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid #777;
+}
+
+.invoice-thank-you h2 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.invoice-thank-you p {
+  margin: 4px 0 0;
+  color: #444;
+  font-size: 1rem;
+}
+
+.invoice-print-host {
+  display: none;
+}
+
 @media print {
   html,
-  body,
-  #root {
+  body {
     height: auto !important;
     overflow: visible !important;
   }
 
-  body * {
-    visibility: hidden;
-  }
-
-  .print-area,
-  .print-area * {
-    visibility: visible;
-  }
-
-  .print-area {
-    box-shadow: none;
-    left: 0;
+  body {
     margin: 0 !important;
-    max-width: none !important;
-    min-height: auto;
-    position: absolute;
-    top: 0;
+    background: #fff !important;
+  }
+
+  body > :not(.invoice-print-host) {
+    display: none !important;
+  }
+
+  .invoice-print-host {
+    display: block !important;
     width: 100%;
   }
 
-  .print-area table {
-    page-break-inside: auto;
+  .invoice-document {
+    width: 100%;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none !important;
   }
 
-  .print-area tr {
+  .invoice-title-row,
+  .invoice-customer-info,
+  .invoice-payment-summary,
+  .invoice-thank-you {
+    break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  .invoice-title-row h1 {
+    font-size: 30pt;
+  }
+
+  .invoice-customer-info {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  }
+
+  .invoice-meta {
+    border-top: 0 !important;
+    border-left: 1px solid #999 !important;
+    padding: 4px 0 4px 24px !important;
+  }
+
+  .invoice-items-wrap {
+    overflow: visible;
+    border-radius: 0;
+  }
+
+  .invoice-items-table thead {
+    display: table-header-group;
+  }
+
+  .invoice-items-table th,
+  .invoice-items-table td {
+    padding: 11px 12px;
+    font-size: 0.95rem;
+  }
+
+  .invoice-items-table .invoice-number-column {
+    width: 8%;
+  }
+
+  .invoice-items-table .invoice-quantity-column {
+    width: 12%;
+  }
+
+  .invoice-items-table .invoice-money-column {
+    width: 18%;
+  }
+
+  .invoice-items-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
+@media (max-width: 767px) {
+  .app-header {
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+  }
+
+  .invoice-document {
+    overflow-wrap: anywhere;
+  }
+
+  input,
+  select,
+  textarea {
+    max-width: 100%;
+    font-size: 16px;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea,
+  button {
+    min-height: 44px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .app-content > section {
+    scroll-padding-bottom: 2rem;
   }
 }

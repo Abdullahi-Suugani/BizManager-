@@ -45,8 +45,8 @@ export function ChangePasswordPage() {
 
   if (success) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#eef3f0] px-5">
-        <section className="w-full max-w-md rounded-lg bg-white p-8 shadow-xl">
+      <main className="flex min-h-[100svh] items-center justify-center bg-[#eef3f0] px-4 py-6 sm:px-5">
+        <section className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl sm:p-8">
           <h1 className="text-2xl font-bold">Password changed</h1>
           <p role="status" className="mt-3 text-sm text-emerald-700">{success}</p>
           <button
@@ -62,8 +62,8 @@ export function ChangePasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#eef3f0] px-5">
-      <form onSubmit={submit} className="w-full max-w-md rounded-lg bg-white p-8 shadow-xl">
+    <main className="flex min-h-[100svh] items-center justify-center bg-[#eef3f0] px-4 py-6 sm:px-5">
+      <form onSubmit={submit} className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl sm:p-8">
         <h1 className="text-2xl font-bold">Change password</h1>
         <p className="mt-2 text-sm text-slate-600">Enter your current password and choose a new password.</p>
         <label className="mt-6 block text-sm font-medium text-slate-700" htmlFor="current-password">Current password</label>
@@ -72,7 +72,7 @@ export function ChangePasswordPage() {
           required
           autoComplete="current-password"
           type="password"
-          className="mt-2 h-11 w-full rounded border px-3"
+          className="mt-2 h-11 w-full min-w-0 rounded border px-3"
           value={currentPassword}
           onChange={(event) => setCurrentPassword(event.target.value)}
         />
@@ -84,7 +84,7 @@ export function ChangePasswordPage() {
           maxLength={128}
           autoComplete="new-password"
           type="password"
-          className="mt-2 h-11 w-full rounded border px-3"
+          className="mt-2 h-11 w-full min-w-0 rounded border px-3"
           value={newPassword}
           onChange={(event) => setNewPassword(event.target.value)}
         />
@@ -97,7 +97,7 @@ export function ChangePasswordPage() {
           maxLength={128}
           autoComplete="new-password"
           type="password"
-          className="mt-2 h-11 w-full rounded border px-3"
+          className="mt-2 h-11 w-full min-w-0 rounded border px-3"
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
         />

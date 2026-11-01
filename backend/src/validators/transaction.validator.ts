@@ -5,6 +5,7 @@ export const createTransactionSchema = z.object({
   customerPhone: z.string().trim().optional(),
   customerAddress: z.string().trim().optional(),
   isPaid: z.boolean().default(false),
+  amountPaid: z.number().finite().min(0, "Paid amount cannot be negative").optional(),
   paymentMethod: z.string().trim().min(1, "Payment method is required").default("Cash"),
   items: z
     .array(
