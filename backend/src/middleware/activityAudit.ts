@@ -105,7 +105,7 @@ export function auditMutation(action: string, recordType: string) {
 function safeActivitySnapshot(recordType: string, value: Record<string, unknown>): Prisma.InputJsonValue | undefined {
   const allowedFields: Record<string, string[]> = {
     EMPLOYEE: ["name", "email", "role", "permissions", "accountStatus"],
-    USER: ["name", "email", "role", "accountStatus"],
+    USER: ["name", "email", "role", "permissions", "accountStatus", "mustChangePassword"],
     PRODUCT: ["name", "code", "sku", "unitPrice", "stockQuantity", "isActive"],
     INVOICE: ["transactionNumber", "totalAmount", "amountPaid", "isPaid", "paymentMethod", "items"],
     CUSTOMER: ["name", "phone", "address"],

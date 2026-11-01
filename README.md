@@ -32,7 +32,7 @@ The application brings sales and inventory records into one PostgreSQL-backed sy
 - Admin and employee login through the same login page.
 - Role-based access checks in both the React application and Express API.
 - JWT bearer-token authentication; tokens expire after eight hours.
-- Admin-managed employee creation, editing, suspension, and reactivation.
+- A User Management dashboard for Admin and Employee accounts, including creation, profile/permission editing, activation, deactivation, details, and password reset.
 - Separate `SUPER_ADMIN` role; Super Admins and Admins have identical business access, while only Super Admins can create Admin accounts.
 - Employee feature permissions are assigned by an Admin or Super Admin and enforced by the API on every protected endpoint.
 - Read-only Activity Logs include successful and failed business mutations and authentication activity.
@@ -603,6 +603,21 @@ Create request example:
 
 The response contains the employee record but never returns the password.
 
+### User management
+
+The authenticated User Management dashboard is available to Admins and Super Admins. It lists Admin and Employee accounts; the Super Admin account is intentionally excluded from account-management operations. Admins can create and manage Employees. Only Super Admins can create, edit, activate/deactivate, or reset passwords for Admin accounts. Account roles cannot be changed through these endpoints.
+
+| Method and path | Purpose |
+|---|---|
+| `GET /api/users` | Admin/Super Admin: list Admin and Employee account details and creation dates. |
+| `GET /api/users/:id` | Admin/Super Admin: view an Admin or Employee account's details. |
+| `POST /api/users` | Admin/Super Admin: create an active Employee with selected permissions and a forced first-login password change. |
+| `POST /api/users/admins` | Super Admin only: create an active Admin with a forced first-login password change. |
+| `PATCH /api/users/:id` | Update name, email, Employee permissions, or account status. Admins can only update Employees; only Super Admins can update Admins. |
+| `POST /api/users/:id/password` | Securely reset a managed user's password and require a change at their next login. Admins can reset Employee passwords; only Super Admins can reset Admin passwords. |
+
+Email addresses are normalized and must be unique across all roles. Password values are accepted only in the request, bcrypt-hashed before storage, excluded from responses and audit snapshots, and never returned to the caller. Password reset requests require at least 12 characters.
+
 ### Products and inventory
 
 All routes below require authentication and the listed employee capability. Admins and Super Admins bypass employee capability checks.
@@ -679,19 +694,20 @@ Login is limited to 10 attempts per IP/path per 15 minutes; email verification t
 
 1. **Sign in.** Use an existing Admin account, a separately provisioned Super Admin account, or an employee account created by an Admin. Employees with temporary passwords must change them at first login.
 2. **Review the dashboard.** Check the summary cards that your account permissions allow.
-3. **Create employee accounts (Admin/Super Admin).** Open Employees, enter a name/email and temporary password, assign only the required feature permissions, and share the temporary password securely. Employees must change it on first login.
-4. **Create Admin accounts (Super Admin only).** Use the Create Admin section in Employees. Each Admin should have a unique account; the Admin cannot create another Admin.
-5. **Manage products and stock.** Use Products for product details; use Inventory for stock receipts, movements, expiry information, and history. Actions require the matching employee permission.
-6. **Manage customers.** Open Customers to create, edit, view, or delete directory records. Invoice customer fields remain stored as historical snapshots.
-7. **Create an invoice.** Open New Invoice, enter customer details, and use either Write Items Manually or Select Existing Products. Enter quantities and manual prices or select catalog items. Total equals the sum of line amounts.
-8. **Save and preview.** Save the invoice to assign its transaction number, then open the preview. Saved invoices can be found through Invoices or Search Records.
-9. **Print or download.** Choose whether to show the business logo, then select Print Invoice or Download PDF. Download PDF opens the browser print dialog; select **Save as PDF** there.
-10. **Manage business information (Admin/Super Admin).** Open Settings to update business contact details, currency, logo, and saved preferences. The per-print logo checkbox starts off each print.
-11. **Review reports and activity (as allowed).** Reports are permission-gated. Admins and Super Admins can use Activity Logs to filter recorded actions and inspect safe record details.
+3. **Create an Employee account (Admin/Super Admin).** Open **User Management** in the sidebar and choose **Create user**. Enter the employee's name and email, choose or generate a temporary password, then select only the permissions they need. Choose **Create user**; share the password securely outside BizManager. The Employee must change it after signing in for the first time.
+4. **Create an Admin account (Super Admin only).** In **User Management**, choose **Create user**, select the **Admin** role, and enter a name, unique email, and initial password (at least 12 characters, or generate one). Admins receive the same business-management access as the Super Admin but cannot create or manage Admin accounts. The new Admin must change the initial password at first login.
+5. **Manage accounts.** Use **View details**, **Edit**, **Activate/Deactivate**, or **Reset password** in the account list. Admins can manage Employee accounts; only Super Admins can manage Admin accounts. A password reset forces the account holder to choose a new password at their next login. Account creation and changes are recorded in Activity Logs.
+6. **Manage products and stock.** Use Products for product details; use Inventory for stock receipts, movements, expiry information, and history. Actions require the matching employee permission.
+7. **Manage customers.** Open Customers to create, edit, view, or delete directory records. Invoice customer fields remain stored as historical snapshots.
+8. **Create an invoice.** Open New Invoice, enter customer details, and use either Write Items Manually or Select Existing Products. Enter quantities and manual prices or select catalog items. Total equals the sum of line amounts.
+9. **Save and preview.** Save the invoice to assign its transaction number, then open the preview. Saved invoices can be found through Invoices or Search Records.
+10. **Print or download.** Choose whether to show the business logo, then select Print Invoice or Download PDF. Download PDF opens the browser print dialog; select **Save as PDF** there.
+11. **Manage business information (Admin/Super Admin).** Open Settings to update business contact details, currency, logo, and saved preferences. The per-print logo checkbox starts off each print.
+12. **Review reports and activity (as allowed).** Reports are permission-gated. Admins and Super Admins can use Activity Logs to filter recorded actions and inspect safe record details.
 
 ## Security
 
-- Passwords are stored as bcrypt hashes (12 rounds); password values are not returned by the employee API.
+- Passwords are stored as bcrypt hashes (12 rounds); password values are not returned by account-management APIs or written to activity logs.
 - Login uses signed JWT access tokens with an eight-hour expiry. The frontend stores the token in browser `localStorage` and attaches it as a bearer token.
 - The API looks up the current user, active account status, role, and employee permissions from PostgreSQL on authenticated requests; it does not trust role or identity values supplied by the frontend.
 - Admin and Super Admin share business-management access. Only the Super Admin account-creation endpoint is more restricted.

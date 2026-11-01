@@ -50,7 +50,7 @@ const navGroups: { title: string; items: { label: string; icon: typeof LayoutDas
     ]
   },
   { title: "Inventory", items: [{ label: "Products", icon: Boxes, path: "/products", permission: "products.view" }, { label: "Inventory", icon: Warehouse, path: "/inventory", permission: "inventory.view" }, { label: "Customers", icon: Users, path: "/customers", permission: "customers.view" }] },
-  { title: "Management", items: [{ label: "Employees", icon: Users, path: "/employees", adminsOnly: true }, { label: "Activity Logs", icon: ShieldCheck, path: "/activity", adminsOnly: true }, { label: "Reports", icon: BarChart3, path: "/reports", permission: "reports.view" }] },
+  { title: "Management", items: [{ label: "User Management", icon: Users, path: "/users", adminsOnly: true }, { label: "Activity Logs", icon: ShieldCheck, path: "/activity", adminsOnly: true }, { label: "Reports", icon: BarChart3, path: "/reports", permission: "reports.view" }] },
   { title: "Settings", items: [{ label: "Settings", icon: Settings, path: "/settings", adminsOnly: true }] }
 ];
 

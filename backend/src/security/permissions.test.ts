@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canCreateAdmin, employeePermissions, hasPermission, isBusinessAdministrator } from "./permissions.js";
+import { canCreateAdmin, canManageUserAccount, employeePermissions, hasPermission, isBusinessAdministrator } from "./permissions.js";
 
 test("Admin and Super Admin share all business capabilities", () => {
   for (const role of ["ADMIN", "SUPER_ADMIN"] as const) {
@@ -23,6 +23,15 @@ test("only Super Admin can create Admin accounts", () => {
   assert.equal(canCreateAdmin("SUPER_ADMIN"), true);
   assert.equal(canCreateAdmin("ADMIN"), false);
   assert.equal(canCreateAdmin("EMPLOYEE"), false);
+});
+
+test("user account management cannot change or manage the Super Admin role", () => {
+  assert.equal(canManageUserAccount("SUPER_ADMIN", "ADMIN"), true);
+  assert.equal(canManageUserAccount("SUPER_ADMIN", "EMPLOYEE"), true);
+  assert.equal(canManageUserAccount("ADMIN", "EMPLOYEE"), true);
+  assert.equal(canManageUserAccount("ADMIN", "ADMIN"), false);
+  assert.equal(canManageUserAccount("EMPLOYEE", "EMPLOYEE"), false);
+  assert.equal(canManageUserAccount("SUPER_ADMIN", "SUPER_ADMIN"), false);
 });
 
 test("permission names are restricted to the known capability allowlist", () => {

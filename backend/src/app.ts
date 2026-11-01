@@ -12,6 +12,7 @@ import { dashboardRouter } from "./routes/dashboard.routes.js";
 import { prisma } from "./config/prisma.js";
 import { activityRouter } from "./routes/activity.routes.js";
 import { customerRouter } from "./routes/customer.routes.js";
+import { userRouter } from "./routes/user.routes.js";
 
 export const app = express();
 
@@ -40,6 +41,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/transactions", transactionRouter);
 app.use("/api/employees", employeeRouter);
+app.use("/api/users", userRouter);
 app.use("/api/reports", reportRouter);
 app.use("/api/products", productRouter);
 app.use("/api/settings", settingsRouter);

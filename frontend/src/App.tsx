@@ -6,7 +6,7 @@ import { ProductsPage } from "./pages/ProductsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { VerifyEmailPage } from "./pages/VerifyEmailPage";
-import { EmployeesPage } from "./pages/EmployeesPage";
+import { UserManagementPage } from "./pages/UserManagementPage";
 import { TransactionsPage } from "./pages/TransactionsPage";
 import { AppShell } from "./components/AppShell";
 import { ReportsPage } from "./pages/ReportsPage";
@@ -32,7 +32,8 @@ export default function App() {
         <Route path="/search" element={<ProtectedRoute permission="invoices.view"><ShellRoute><TransactionsPage search /></ShellRoute></ProtectedRoute>} />
         <Route path="/products" element={<ProtectedRoute permission="products.view"><ProductsPage /></ProtectedRoute>} />
         <Route path="/inventory" element={<ProtectedRoute permission="inventory.view"><InventoryPage /></ProtectedRoute>} />
-        <Route path="/employees" element={<AdminShellRoute><EmployeesPage /></AdminShellRoute>} />
+        <Route path="/users" element={<AdminShellRoute><UserManagementPage /></AdminShellRoute>} />
+        <Route path="/employees" element={<Navigate to="/users" replace />} />
         <Route path="/customers" element={<ProtectedRoute permission="customers.view"><CustomersPage /></ProtectedRoute>} />
         <Route path="/activity" element={<AdminShellRoute><ActivityLogsPage /></AdminShellRoute>} />
         <Route path="/reports" element={<ProtectedRoute permission="reports.view"><ReportsPage /></ProtectedRoute>} />

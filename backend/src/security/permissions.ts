@@ -32,6 +32,12 @@ export function canCreateAdmin(role: Role) {
   return role === "SUPER_ADMIN";
 }
 
+export function canManageUserAccount(actorRole: Role, targetRole: Role) {
+  if (targetRole === "SUPER_ADMIN") return false;
+  if (targetRole === "ADMIN") return canCreateAdmin(actorRole);
+  return isBusinessAdministrator(actorRole);
+}
+
 export function hasPermission(role: Role, permissions: string[], permission: EmployeePermission) {
   return isBusinessAdministrator(role) || permissions.includes(permission) ||
     (permissionImplications[permission]?.some((impliedPermission) => permissions.includes(impliedPermission)) ?? false);

@@ -26,3 +26,14 @@ export const createAdminSchema = z.object({
 });
 
 export const employeeIdSchema = z.object({ id: z.string().cuid() });
+
+export const updateManagedUserSchema = z.object({
+  name: z.string().trim().min(2).max(100).optional(),
+  email: z.string().trim().toLowerCase().email().optional(),
+  accountStatus: employeeStatus.optional(),
+  permissions: permissionList.optional()
+}).strict().refine((data) => Object.keys(data).length > 0, "At least one user field is required");
+
+export const resetManagedUserPasswordSchema = z.object({
+  password: z.string().min(12).max(128)
+}).strict();
