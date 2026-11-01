@@ -725,12 +725,14 @@ Login is limited to 10 attempts per IP/path per 15 minutes; email verification t
 
 ### Available checks
 
-The backend has focused unit tests for the shared role/permission policy. The project does not currently have an API integration-test harness or configured browser end-to-end tests. Run the available check commands:
+The backend has focused role/permission and validation tests, plus local HTTP tests for Admin and Employee account creation. The HTTP tests stub Prisma calls, so they do not write to the configured database. There are no configured browser end-to-end tests. Run the available check commands:
 
 ```powershell
 npm run build
 npx prisma validate --schema .\backend\prisma\schema.prisma
 npx tsx --test .\backend\src\security\permissions.test.ts
+npx tsx --test .\backend\src\validators\employee.validator.test.ts
+npx tsx --test .\backend\tests\user-management.routes.test.mjs
 ```
 
 For a local service smoke check after starting the API:

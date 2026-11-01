@@ -13,7 +13,7 @@ test("employee creation normalizes email and accepts assigned capabilities", () 
   assert.deepEqual(parsed.permissions, ["invoices.view", "products.view"]);
 });
 
-test("Admin creation requires a unique-style email field and a longer initial password", () => {
+test("Admin creation requires a 12-character initial password", () => {
   assert.equal(createAdminSchema.safeParse({
     name: "Example Admin",
     email: "admin@example.com",
