@@ -9,9 +9,6 @@ type Transaction = {
   customerName: string | null;
   customerPhone: string | null;
   customerAddress: string | null;
-  discount: string | number;
-  taxRate: string | number;
-  taxAmount: string | number;
   isPaid: boolean;
   paymentMethod: string;
   totalAmount: string | number;
@@ -63,8 +60,6 @@ function InvoiceDocument({ transaction, settings, showBusinessLogo }: { transact
         </tbody>
       </table>
       <div className="mt-6 space-y-1 text-right text-sm">
-        <p>Discount: ${Number(transaction.discount).toFixed(2)}</p>
-        <p>Tax ({Number(transaction.taxRate).toFixed(2)}%): ${Number(transaction.taxAmount).toFixed(2)}</p>
         <p className="text-xl font-bold">Total: ${Number(transaction.totalAmount).toFixed(2)}</p>
       </div>
     </article>

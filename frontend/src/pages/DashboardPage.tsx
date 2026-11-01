@@ -52,8 +52,6 @@ export function DashboardPage() {
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [discount, setDiscount] = useState(0);
-  const [taxRate, setTaxRate] = useState(0);
   const [isPaid, setIsPaid] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [showPreview, setShowPreview] = useState(false);
@@ -93,13 +91,11 @@ export function DashboardPage() {
   useEffect(() => {
     if (!editId) return;
     setIsLoadingEdit(true);
-    api.get<{ transaction: { transactionNumber: string; createdAt: string; customerName: string | null; customerPhone: string | null; customerAddress: string | null; discount: string | number; taxRate: string | number; isPaid: boolean; paymentMethod: string; items: { productId: string | null; itemName: string; quantity: string | number; unitPrice: string | number }[] } }>(`/transactions/${editId}`)
+    api.get<{ transaction: { transactionNumber: string; createdAt: string; customerName: string | null; customerPhone: string | null; customerAddress: string | null; isPaid: boolean; paymentMethod: string; items: { productId: string | null; itemName: string; quantity: string | number; unitPrice: string | number }[] } }>(`/transactions/${editId}`)
       .then(({ data: { transaction } }) => {
         setCustomerName(transaction.customerName ?? "");
         setPhone(transaction.customerPhone ?? "");
         setAddress(transaction.customerAddress ?? "");
-        setDiscount(Number(transaction.discount));
-        setTaxRate(Number(transaction.taxRate));
         setIsPaid(transaction.isPaid);
         setPaymentMethod(transaction.paymentMethod);
         setSavedTransactionNumber(transaction.transactionNumber);
@@ -130,9 +126,7 @@ export function DashboardPage() {
 
   const items = useMemo(() => [...manualItems, ...productItems], [manualItems, productItems]);
   const subtotal = useMemo(() => roundMoney(items.reduce((sum, item) => sum + roundMoney(item.qty * item.price), 0)), [items]);
-  const discountedSubtotal = roundMoney(Math.max(subtotal - discount, 0));
-  const taxAmount = roundMoney(discountedSubtotal * (taxRate / 100));
-  const total = roundMoney(discountedSubtotal + taxAmount);
+  const total = subtotal;
   const paidAmount = isPaid ? total : 0;
   const remaining = Math.max(total - paidAmount, 0);
   const workspaceGridClass = showPreview
@@ -209,8 +203,6 @@ export function DashboardPage() {
         customerName,
         customerPhone: phone,
         customerAddress: address,
-        discount,
-        taxRate,
         isPaid,
         paymentMethod,
         items: validItems
@@ -308,8 +300,6 @@ export function DashboardPage() {
             <div className="shrink-0 grid gap-5 p-4 md:grid-cols-2">
               <div className="space-y-3">
                 <MoneyRow label="Subtotal" value={`$${subtotal.toFixed(2)}`} />
-                <NumberField label="Discount" value={discount} onChange={setDiscount} />
-                <NumberField label="Tax (%)" value={taxRate} onChange={setTaxRate} />
                 <MoneyRow label="Total" value={`$${total.toFixed(2)}`} strong />
               </div>
               <div className="space-y-3 border-t border-slate-200 pt-4 md:border-l md:border-t-0 md:pl-5 md:pt-0">
@@ -335,7 +325,7 @@ export function DashboardPage() {
           </section>
 
           {showPreview ? (
-          <InvoicePreview transactionNumber={savedTransactionNumber || "Not saved"} customerName={customerName} phone={phone} address={address} items={items.filter((entry) => entry.product.trim())} subtotal={subtotal} discount={discount} taxRate={taxRate} taxAmount={taxAmount} total={total} paidAmount={paidAmount} paymentMethod={paymentMethod} remaining={remaining} date={displayDate} businessName={invoiceSettings.businessName} logoData={invoiceSettings.logoData} showBusinessLogo={showBusinessLogo} />
+          <InvoicePreview transactionNumber={savedTransactionNumber || "Not saved"} customerName={customerName} phone={phone} address={address} items={items.filter((entry) => entry.product.trim())} subtotal={subtotal} total={total} paidAmount={paidAmount} paymentMethod={paymentMethod} remaining={remaining} date={displayDate} businessName={invoiceSettings.businessName} logoData={invoiceSettings.logoData} showBusinessLogo={showBusinessLogo} />
           ) : null}
 
           <aside className={`space-y-4 ${showPreview ? "lg:col-span-2 xl:col-span-1" : ""}`}>
@@ -417,21 +407,6 @@ function MoneyRow({ label, value, strong, danger }: { label: string; value: stri
   );
 }
 
-function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
-  return (
-    <label className="grid grid-cols-[96px_minmax(120px,1fr)] items-center gap-3 text-sm">
-      <span>{label}</span>
-      <input
-        className="h-10 rounded-md border border-slate-300 px-3 text-right"
-        value={value === 0 ? "" : value}
-        onChange={(event) => onChange(Number(event.target.value) || 0)}
-        type="number"
-        min="0"
-      />
-    </label>
-  );
-}
-
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-2xl font-bold text-emerald-800">{value}</p></div>;
 }
@@ -443,9 +418,6 @@ function InvoicePreview({
   address,
   items,
   subtotal,
-  discount,
-  taxRate,
-  taxAmount,
   total,
   paidAmount,
   paymentMethod,
@@ -461,9 +433,6 @@ function InvoicePreview({
   address: string;
   items: Item[];
   subtotal: number;
-  discount: number;
-  taxRate: number;
-  taxAmount: number;
   total: number;
   paidAmount: number;
   paymentMethod: string;
@@ -516,8 +485,6 @@ function InvoicePreview({
       </div>
       <div className="ml-auto mt-10 w-full max-w-72 space-y-3 text-sm">
         <Summary label="SUBTOTAL" value={`$${subtotal.toFixed(2)}`} />
-        <Summary label="DISCOUNT" value={`$${discount.toFixed(2)}`} />
-        <Summary label={`TAX (${taxRate}%)`} value={`$${taxAmount.toFixed(2)}`} />
         <div className="border-t border-emerald-700 pt-4">
           <Summary label="TOTAL" value={`$${total.toFixed(2)}`} strong />
         </div>

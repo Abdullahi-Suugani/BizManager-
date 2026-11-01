@@ -9,11 +9,9 @@ function money(value: number) {
   return Number(value.toFixed(2));
 }
 
-function calculateTotals(items: { amount: number }[], discountValue: number, taxRate: number) {
+function calculateTotals(items: { amount: number }[]) {
   const subtotal = money(items.reduce((sum, item) => sum + item.amount, 0));
-  const discount = money(Math.min(discountValue, subtotal));
-  const taxAmount = money((subtotal - discount) * (taxRate / 100));
-  return { subtotal, discount, taxAmount, totalAmount: money(subtotal - discount + taxAmount) };
+  return { subtotal, totalAmount: subtotal };
 }
 
 async function prepareItems(tx: Prisma.TransactionClient, items: ReturnType<typeof createTransactionSchema.parse>["items"]) {
@@ -145,9 +143,9 @@ function transactionFields(data: ReturnType<typeof createTransactionSchema.parse
     customerName: data.customerName,
     customerPhone: data.customerPhone,
     customerAddress: data.customerAddress,
-    discount: totals.discount,
-    taxRate: data.taxRate,
-    taxAmount: totals.taxAmount,
+    discount: 0,
+    taxRate: 0,
+    taxAmount: 0,
     isPaid: data.isPaid,
     paymentMethod: data.paymentMethod
   };
@@ -164,7 +162,7 @@ export async function createTransaction(req: Request, res: Response) {
   const data = createTransactionSchema.parse(req.body);
   const saved = await prisma.$transaction(async (tx) => {
     const { productById, calculatedItems } = await prepareItems(tx, data.items);
-    const totals = calculateTotals(calculatedItems, data.discount, data.taxRate);
+    const totals = calculateTotals(calculatedItems);
     const transaction = await tx.transaction.create({
       data: {
         transactionNumber: await nextTransactionNumber(tx),
@@ -200,7 +198,7 @@ export async function updateTransaction(req: Request, res: Response) {
     }
 
     const { productById, calculatedItems } = await prepareItems(tx, data.items);
-    const totals = calculateTotals(calculatedItems, data.discount, data.taxRate);
+    const totals = calculateTotals(calculatedItems);
     await releaseInventory(tx, req.user!.id, id);
     await reserveInventory(tx, req.user!.id, id, data.items, productById);
     return tx.transaction.update({

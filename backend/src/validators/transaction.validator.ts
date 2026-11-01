@@ -4,8 +4,6 @@ export const createTransactionSchema = z.object({
   customerName: z.string().trim().min(1, "Customer name is required"),
   customerPhone: z.string().trim().optional(),
   customerAddress: z.string().trim().optional(),
-  discount: z.number().min(0).default(0),
-  taxRate: z.number().min(0).default(0),
   isPaid: z.boolean().default(false),
   paymentMethod: z.string().trim().min(1, "Payment method is required").default("Cash"),
   items: z
