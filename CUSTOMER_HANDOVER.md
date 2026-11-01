@@ -65,9 +65,10 @@ To inspect an existing Admin without changing it, set `ADMIN_RESET_EMAIL` to its
 
 - Create a test employee from Employees and securely record the temporary password.
 - Log in as that employee, change the temporary password when prompted, and refresh the browser to test session restoration.
-- Create an invoice with a manual line item.
-- Create an invoice using a catalog product and confirm stock decreases.
-- Open the saved invoice and verify its generated transaction number.
+- Create an invoice with manual item names and multiple lines; switch to product selection and back to verify neither draft is lost.
+- Create an invoice using a catalog product and confirm stock decreases; edit the new invoice and confirm stock adjustments are reversed and re-applied.
+- Open the saved invoice and verify its generated transaction number, line descriptions, and totals.
+- Print once with Show Business Logo off and once with it on; confirm the logo option resets after each print.
 - Search invoices and apply date filters.
 - Open Reports and confirm totals are based on saved transactions.
 - As Admin, edit Settings and refresh to confirm persistence.
@@ -87,4 +88,10 @@ Resend testing senders may only deliver to the Resend account email. For a real 
 
 ## 8. Invoice persistence status
 
-The invoice form persists customer contact, discount, tax, payment status, and payment method fields on `Transaction`. Migration `20261015010000_add_transaction_invoice_fields` has been applied, and Prisma reports that the database schema is up to date.
+The invoice form persists customer contact, discount, tax, payment status, and payment method fields on `Transaction`. Migration `20261015010000_add_transaction_invoice_fields` added those fields. The additive migration `20261101000000_add_invoice_descriptions_and_business_logo` adds an optional uploaded business logo; deploy it with the Prisma commands in section 2 before running this application version. It does not reset or replace existing records. No description field is shown or used for new invoice entries.
+
+Invoice edits created after this update are linked to their stock movements so inventory can be safely restored and re-applied. Older product invoices lack that link and are intentionally rejected for editing rather than risking incorrect stock counts; older manual-only invoices can still be edited.
+
+## 9. Administrator credentials
+
+The existing Admin account and its credentials are not changed by this update. Multiple people can sign in with that same account, but doing so makes actions indistinguishable in invoice and employee records, increases the chance of password disclosure, and means one password change or compromise affects everyone using it. Prefer individual named accounts with Admin permissions and retain the central account for emergency access. The current role checks support the Admin role, but the employee screen does not grant that role; a restricted role-assignment workflow should be added before using this alternative.

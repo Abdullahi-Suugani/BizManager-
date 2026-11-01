@@ -13,6 +13,7 @@ export const createTransactionSchema = z.object({
       z.object({
         productId: z.string().cuid().optional(),
         itemName: z.string().trim().min(1, "Item name is required"),
+        description: z.string().trim().max(1000).optional(),
         quantity: z.number().positive("Quantity must be greater than zero"),
         unitPrice: z.number().min(0, "Unit price cannot be negative")
       })

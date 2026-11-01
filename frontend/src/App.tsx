@@ -22,6 +22,7 @@ export default function App() {
         <Route path="/change-password" element={<ChangePasswordPage />} />
         <Route path="/dashboard" element={<ShellRoute><DashboardPage /></ShellRoute>} />
         <Route path="/transactions/new" element={<ShellRoute><DashboardPage /></ShellRoute>} />
+        <Route path="/transactions/:id/edit" element={<ShellRoute><DashboardPage /></ShellRoute>} />
         <Route path="/transactions" element={<ShellRoute><TransactionsPage /></ShellRoute>} />
         <Route path="/search" element={<ShellRoute><TransactionsPage search /></ShellRoute>} />
         <Route path="/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />

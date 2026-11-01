@@ -85,6 +85,7 @@ model TransactionItem {
   id            String      @id @default(cuid())
   transactionId String
   itemName      String
+  description   String?     @db.Text
   quantity      Decimal     @db.Decimal(12, 2)
   unitPrice     Decimal     @db.Decimal(12, 2)
   amount        Decimal     @db.Decimal(12, 2)
@@ -165,6 +166,7 @@ model BusinessSettings {
   showBusinessContact   Boolean  @default(true)
   showInvoiceLogo       Boolean  @default(false)
   showPaymentStatus     Boolean  @default(true)
+  logoData              String?  @db.Text
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }

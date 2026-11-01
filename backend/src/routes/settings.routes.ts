@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { getSettings, updateSettings } from "../controllers/settings.controller.js";
+import { getInvoiceSettings, getSettings, updateSettings } from "../controllers/settings.controller.js";
 export const settingsRouter = Router();
-settingsRouter.use(requireAuth, requireRole("ADMIN"));
-settingsRouter.get("/", asyncHandler(getSettings));
+settingsRouter.use(requireAuth);
+settingsRouter.get("/invoice", asyncHandler(getInvoiceSettings));
+settingsRouter.get("/", requireRole("ADMIN"), asyncHandler(getSettings));
 settingsRouter.put("/", requireRole("ADMIN"), asyncHandler(updateSettings));

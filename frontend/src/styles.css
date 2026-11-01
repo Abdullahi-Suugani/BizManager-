@@ -21,7 +21,19 @@ body {
 .app-content { min-height: 0; flex: 1; overflow-y: auto; overflow-x: hidden; }
 @media (min-width: 1024px) { .app-header { padding-inline: 1.75rem; } }
 
+@page {
+  size: A4 portrait;
+  margin: 14mm;
+}
+
 @media print {
+  html,
+  body,
+  #root {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
   body * {
     visibility: hidden;
   }
@@ -34,9 +46,19 @@ body {
   .print-area {
     box-shadow: none;
     left: 0;
+    margin: 0 !important;
+    max-width: none !important;
     min-height: auto;
     position: absolute;
     top: 0;
     width: 100%;
+  }
+
+  .print-area table {
+    page-break-inside: auto;
+  }
+
+  .print-area tr {
+    page-break-inside: avoid;
   }
 }

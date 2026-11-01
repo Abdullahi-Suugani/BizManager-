@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import {
   BarChart3,
   Boxes,
@@ -18,7 +18,6 @@ import {
   Users,
   X
 } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
 import { api } from "../services/api";
 
 type Item = {
@@ -29,6 +28,9 @@ type Item = {
 };
 type CatalogProduct = { id: string; name: string; code: string; unitPrice: string | number; stockQuantity: string | number };
 type DashboardSummary = { salesTotal: number; transactionCount: number; activeProductCount: number; activeEmployeeCount: number };
+type InvoiceSettings = { businessName: string; logoData: string | null };
+const emptyItem = (): Item => ({ product: "", qty: 1, price: 0 });
+const roundMoney = (value: number) => Number(value.toFixed(2));
 
 const navGroups = [
   { title: "Dashboard", items: [{ label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" }] },
@@ -46,7 +48,7 @@ const navGroups = [
 ];
 
 export function DashboardPage() {
-  const { user } = useAuth();
+  const { id: editId } = useParams();
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -59,10 +61,18 @@ export function DashboardPage() {
   const [saveError, setSaveError] = useState("");
   const [savedTransactionNumber, setSavedTransactionNumber] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [items, setItems] = useState<Item[]>([{ product: "", qty: 1, price: 0 }]);
+  const [isLoadingEdit, setIsLoadingEdit] = useState(Boolean(editId));
+  const [editLoaded, setEditLoaded] = useState(!editId);
+  const [itemMode, setItemMode] = useState<"manual" | "products">("manual");
+  const [manualItems, setManualItems] = useState<Item[]>([emptyItem()]);
+  const [productItems, setProductItems] = useState<Item[]>([]);
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
   const [catalogError, setCatalogError] = useState("");
+  const [settingsError, setSettingsError] = useState("");
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings>({ businessName: "BizManager Business", logoData: null });
+  const [showBusinessLogo, setShowBusinessLogo] = useState(false);
+  const [invoiceDate, setInvoiceDate] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<{ products: CatalogProduct[] }>("/products")
@@ -71,13 +81,58 @@ export function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    api.get<{ settings: InvoiceSettings }>("/settings/invoice")
+      .then((response) => setInvoiceSettings(response.data.settings))
+      .catch(() => setSettingsError("Business invoice settings are unavailable."));
+  }, []);
+
+  useEffect(() => {
     api.get<DashboardSummary>("/dashboard/summary").then((response) => setSummary(response.data)).catch(() => undefined);
   }, []);
 
-  const subtotal = useMemo(() => items.reduce((sum, item) => sum + item.qty * item.price, 0), [items]);
-  const discountedSubtotal = Math.max(subtotal - discount, 0);
-  const taxAmount = discountedSubtotal * (taxRate / 100);
-  const total = discountedSubtotal + taxAmount;
+  useEffect(() => {
+    if (!editId) return;
+    setIsLoadingEdit(true);
+    api.get<{ transaction: { transactionNumber: string; createdAt: string; customerName: string | null; customerPhone: string | null; customerAddress: string | null; discount: string | number; taxRate: string | number; isPaid: boolean; paymentMethod: string; items: { productId: string | null; itemName: string; quantity: string | number; unitPrice: string | number }[] } }>(`/transactions/${editId}`)
+      .then(({ data: { transaction } }) => {
+        setCustomerName(transaction.customerName ?? "");
+        setPhone(transaction.customerPhone ?? "");
+        setAddress(transaction.customerAddress ?? "");
+        setDiscount(Number(transaction.discount));
+        setTaxRate(Number(transaction.taxRate));
+        setIsPaid(transaction.isPaid);
+        setPaymentMethod(transaction.paymentMethod);
+        setSavedTransactionNumber(transaction.transactionNumber);
+        setInvoiceDate(transaction.createdAt);
+        const toItem = (entry: typeof transaction.items[number]): Item => ({
+          product: entry.itemName,
+          ...(entry.productId ? { productId: entry.productId } : {}),
+          qty: Number(entry.quantity),
+          price: Number(entry.unitPrice)
+        });
+        const manual = transaction.items.filter((entry) => !entry.productId).map(toItem);
+        const products = transaction.items.filter((entry) => entry.productId).map(toItem);
+        setManualItems(manual.length ? manual : [emptyItem()]);
+        setProductItems(products);
+        setItemMode(manual.length ? "manual" : "products");
+        setShowPreview(true);
+        setEditLoaded(true);
+      })
+      .catch((requestError: any) => setSaveError(requestError.response?.data?.message ?? "Unable to load invoice for editing."))
+      .finally(() => setIsLoadingEdit(false));
+  }, [editId]);
+
+  useEffect(() => {
+    const resetLogoOption = () => setShowBusinessLogo(false);
+    window.addEventListener("afterprint", resetLogoOption);
+    return () => window.removeEventListener("afterprint", resetLogoOption);
+  }, []);
+
+  const items = useMemo(() => [...manualItems, ...productItems], [manualItems, productItems]);
+  const subtotal = useMemo(() => roundMoney(items.reduce((sum, item) => sum + roundMoney(item.qty * item.price), 0)), [items]);
+  const discountedSubtotal = roundMoney(Math.max(subtotal - discount, 0));
+  const taxAmount = roundMoney(discountedSubtotal * (taxRate / 100));
+  const total = roundMoney(discountedSubtotal + taxAmount);
   const paidAmount = isPaid ? total : 0;
   const remaining = Math.max(total - paidAmount, 0);
   const workspaceGridClass = showPreview
@@ -88,24 +143,39 @@ export function DashboardPage() {
     month: "short",
     year: "numeric"
   }).format(new Date());
+  const displayDate = invoiceDate ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(invoiceDate)) : today;
+
+  function setModeItems(mode: "manual" | "products", updater: (current: Item[]) => Item[]) {
+    const setter = mode === "manual" ? setManualItems : setProductItems;
+    setter(updater);
+  }
+
+  function switchItemMode(mode: "manual" | "products") {
+    setItemMode(mode);
+  }
 
   function updateItem(index: number, field: keyof Item, value: string) {
-    setItems((current) =>
-      current.map((item, itemIndex) =>
-        itemIndex === index
-          ? { ...item, [field]: field === "product" ? value : Number(value) || 0 }
-          : item
-      )
+    setModeItems(itemMode, (current) =>
+      current.map((entry, itemIndex) => itemIndex === index
+        ? { ...entry, [field]: field === "product" ? value : Number.isFinite(Number(value)) ? Number(value) : 0 }
+        : entry)
     );
   }
 
   function selectProduct(index: number, productId: string) {
     const product = catalog.find((entry) => entry.id === productId);
-    setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, productId: product?.id, product: product?.name ?? "", price: product ? Number(product.unitPrice) : 0 } : item));
+    setModeItems("products", (current) => current.map((item, itemIndex) => itemIndex === index
+      ? { ...item, productId: product?.id, product: product?.name ?? "", price: product ? Number(product.unitPrice) : 0 }
+      : item));
+  }
+
+  function printInvoice() {
+    setShowPreview(true);
+    window.setTimeout(() => window.print(), 100);
   }
 
   async function saveInvoice() {
-    if (isSaving) return;
+    if (isSaving || isLoadingEdit || !editLoaded) return;
     setSaveMessage("");
     setSaveError("");
 
@@ -127,11 +197,15 @@ export function DashboardPage() {
       setSaveError("Add at least one item");
       return;
     }
+    if (validItems.some((entry) => entry.quantity <= 0 || entry.unitPrice < 0)) {
+      setSaveError("Item quantities must be positive and unit prices cannot be negative.");
+      return;
+    }
 
     setIsSaving(true);
 
     try {
-      const response = await api.post<{ transaction: { transactionNumber: string } }>("/transactions", {
+      const payload = {
         customerName,
         customerPhone: phone,
         customerAddress: address,
@@ -140,9 +214,12 @@ export function DashboardPage() {
         isPaid,
         paymentMethod,
         items: validItems
-      });
+      };
+      const response = editId
+        ? await api.put<{ transaction: { transactionNumber: string } }>(`/transactions/${editId}`, payload)
+        : await api.post<{ transaction: { transactionNumber: string } }>("/transactions", payload);
 
-      setSaveMessage(`Saved ${response.data.transaction.transactionNumber}`);
+      setSaveMessage(`${editId ? "Updated" : "Saved"} ${response.data.transaction.transactionNumber}`);
       setSavedTransactionNumber(response.data.transaction.transactionNumber);
       setShowPreview(true);
     } catch (error: any) {
@@ -171,43 +248,49 @@ export function DashboardPage() {
 
             <div className="flex-1 border-b border-slate-200 p-4">
               <h3 className="mb-4 font-bold text-emerald-800">Invoice Items</h3>
+              <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Invoice item entry method">
+                <button type="button" aria-pressed={itemMode === "manual"} onClick={() => switchItemMode("manual")} className={`rounded-md px-4 py-2 text-sm font-semibold ${itemMode === "manual" ? "bg-emerald-700 text-white" : "border border-slate-300 text-slate-700"}`}>
+                  Write Items Manually
+                </button>
+                <button type="button" aria-pressed={itemMode === "products"} onClick={() => switchItemMode("products")} className={`rounded-md px-4 py-2 text-sm font-semibold ${itemMode === "products" ? "bg-emerald-700 text-white" : "border border-slate-300 text-slate-700"}`}>
+                  Select Existing Products
+                </button>
+              </div>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] table-fixed text-sm">
-                  <colgroup>
-                    <col className="w-10" />
-                    <col />
-                    <col className="w-24" />
-                    <col className="w-28" />
-                    <col className="w-32" />
-                    <col className="w-10" />
-                  </colgroup>
+                <table className="w-full min-w-[700px] text-sm">
                   <thead className="bg-slate-100 text-emerald-900">
                     <tr>
                       <th className="px-2 py-3 text-left">#</th>
-                      <th className="px-2 py-3 text-left">Product</th>
-                      <th className="px-2 py-3 text-center">Qty</th>
-                      <th className="px-2 py-3 text-center">Price</th>
+                      <th className="px-2 py-3 text-left">Item Name</th>
+                      <th className="px-2 py-3 text-center">Quantity</th>
+                      <th className="px-2 py-3 text-center">Unit Price</th>
                       <th className="px-2 py-3 text-right">Total</th>
                       <th className="px-2 py-3" />
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((item, index) => (
+                    {(itemMode === "manual" ? manualItems : productItems).map((item, index) => (
                       <tr key={index} className="border-b border-slate-100">
                         <td className="px-2 py-2">{index + 1}</td>
                         <td className="px-2 py-2">
-                          {catalog.length > 0 ? <select className="w-full rounded border border-slate-200 bg-white px-2 py-1" value={item.productId ?? ""} onChange={(event) => selectProduct(index, event.target.value)}><option value="">Manual item</option>{catalog.map((product) => <option key={product.id} value={product.id}>{product.name} ({Number(product.stockQuantity).toFixed(2)} in stock)</option>)}</select> : <input className="w-full bg-transparent outline-none" value={item.product} onChange={(event) => updateItem(index, "product", event.target.value)} />}
-                          {item.productId ? <span className="mt-1 block text-xs text-slate-500">{item.product}</span> : null}
+                          {itemMode === "manual" ? (
+                            <input aria-label={`Item ${index + 1} name`} className="w-full rounded border border-slate-200 px-2 py-1" placeholder="Item name" value={item.product} onChange={(event) => updateItem(index, "product", event.target.value)} />
+                          ) : (
+                            <select aria-label={`Item ${index + 1} product`} className="w-full rounded border border-slate-200 bg-white px-2 py-1" value={item.productId ?? ""} onChange={(event) => selectProduct(index, event.target.value)}>
+                              <option value="">Choose a product</option>
+                              {catalog.map((product) => <option key={product.id} value={product.id}>{product.name} ({Number(product.stockQuantity).toFixed(2)} in stock)</option>)}
+                            </select>
+                          )}
                         </td>
                         <td className="px-2 py-2 text-center">
-                          <input className="mx-auto h-8 w-16 rounded border border-transparent bg-transparent text-center outline-none focus:border-slate-300" value={item.qty} onChange={(event) => updateItem(index, "qty", event.target.value)} type="number" min="1" />
+                          <input aria-label={`Item ${index + 1} quantity`} className="mx-auto h-8 w-20 rounded border border-slate-300 text-center" value={item.qty} onChange={(event) => updateItem(index, "qty", event.target.value)} type="number" min="0.01" step="0.01" />
                         </td>
                         <td className="px-2 py-2 text-center">
-                          <input className="mx-auto h-8 w-20 rounded border border-transparent bg-transparent text-center outline-none focus:border-slate-300" value={item.price === 0 ? "" : item.price} onChange={(event) => updateItem(index, "price", event.target.value)} type="number" min="0" />
+                          <input aria-label={`Item ${index + 1} unit price`} className="mx-auto h-8 w-24 rounded border border-slate-300 text-center" value={item.price} onChange={(event) => updateItem(index, "price", event.target.value)} type="number" min="0" step="0.01" readOnly={itemMode === "products"} />
                         </td>
                         <td className="px-2 py-2 text-right">${(item.qty * item.price).toFixed(2)}</td>
                         <td className="px-2 py-2 text-right">
-                          <button onClick={() => setItems(items.filter((_, itemIndex) => itemIndex !== index))} className="text-red-600" aria-label="Remove item">
+                          <button type="button" onClick={() => setModeItems(itemMode, (current) => current.filter((_, itemIndex) => itemIndex !== index))} className="text-red-600" aria-label="Remove item">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </td>
@@ -217,8 +300,8 @@ export function DashboardPage() {
                 </table>
               </div>
               {catalogError ? <p className="mt-3 text-xs text-amber-700">{catalogError}</p> : null}
-              <button onClick={() => setItems([...items, { product: "", qty: 1, price: 0 }])} className="mt-4 rounded-md border border-emerald-700 px-4 py-2 text-sm font-semibold text-emerald-800">
-                + Add Item
+              <button type="button" onClick={() => setModeItems(itemMode, (current) => [...current, emptyItem()])} className="mt-4 rounded-md border border-emerald-700 px-4 py-2 text-sm font-semibold text-emerald-800">
+                + Add {itemMode === "manual" ? "Manual Item" : "Product"}
               </button>
             </div>
 
@@ -252,15 +335,15 @@ export function DashboardPage() {
           </section>
 
           {showPreview ? (
-          <InvoicePreview transactionNumber={savedTransactionNumber || "Not saved"} customerName={customerName} phone={phone} address={address} items={items} subtotal={subtotal} discount={discount} taxRate={taxRate} taxAmount={taxAmount} total={total} paidAmount={paidAmount} paymentMethod={paymentMethod} remaining={remaining} date={today} />
+          <InvoicePreview transactionNumber={savedTransactionNumber || "Not saved"} customerName={customerName} phone={phone} address={address} items={items.filter((entry) => entry.product.trim())} subtotal={subtotal} discount={discount} taxRate={taxRate} taxAmount={taxAmount} total={total} paidAmount={paidAmount} paymentMethod={paymentMethod} remaining={remaining} date={displayDate} businessName={invoiceSettings.businessName} logoData={invoiceSettings.logoData} showBusinessLogo={showBusinessLogo} />
           ) : null}
 
           <aside className={`space-y-4 ${showPreview ? "lg:col-span-2 xl:col-span-1" : ""}`}>
             <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
               <h3 className="mb-5 text-sm font-bold uppercase">Actions</h3>
-              <button onClick={saveInvoice} disabled={isSaving} className="mb-4 flex h-11 w-full items-center justify-center gap-2 rounded-md bg-emerald-700 font-semibold text-white disabled:bg-slate-400">
+              <button onClick={saveInvoice} disabled={isSaving || isLoadingEdit || !editLoaded} className="mb-4 flex h-11 w-full items-center justify-center gap-2 rounded-md bg-emerald-700 font-semibold text-white disabled:bg-slate-400">
                 <Save className="h-4 w-4" />
-                {isSaving ? "Saving..." : "Save Invoice"}
+                {isLoadingEdit ? "Loading invoice..." : isSaving ? "Saving..." : editId ? "Update Invoice" : "Save Invoice"}
               </button>
               <button onClick={() => setShowPreview((current) => !current)} className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-emerald-700 font-semibold text-white">
                 <ReceiptText className="h-4 w-4" />
@@ -268,21 +351,21 @@ export function DashboardPage() {
               </button>
               {saveMessage ? <p className="mt-3 text-sm font-semibold text-emerald-700">{saveMessage}</p> : null}
               {saveError ? <p className="mt-3 text-sm font-semibold text-red-600">{saveError}</p> : null}
+              {settingsError ? <p className="mt-3 text-sm text-amber-700">{settingsError}</p> : null}
+              <label className="mt-4 flex items-center gap-2 text-sm font-medium">
+                <input type="checkbox" checked={showBusinessLogo} onChange={(event) => setShowBusinessLogo(event.target.checked)} />
+                Show Business Logo
+              </label>
+              {!invoiceSettings.logoData ? <p className="mt-1 text-xs text-slate-500">Upload a logo in Business Settings to display it on invoices.</p> : null}
               <button
-                onClick={() => {
-                  setShowPreview(true);
-                  window.setTimeout(() => window.print(), 100);
-                }}
+                onClick={printInvoice}
                 className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white font-medium"
               >
                 <Printer className="h-4 w-4" />
                 Print Invoice
               </button>
               <button
-                onClick={() => {
-                  setShowPreview(true);
-                  window.setTimeout(() => window.print(), 100);
-                }}
+                onClick={printInvoice}
                 className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white font-medium"
               >
                 <FileText className="h-4 w-4" />
@@ -367,7 +450,10 @@ function InvoicePreview({
   paidAmount,
   paymentMethod,
   remaining,
-  date
+  date,
+  businessName,
+  logoData,
+  showBusinessLogo
 }: {
   transactionNumber: string;
   customerName: string;
@@ -383,34 +469,34 @@ function InvoicePreview({
   paymentMethod: string;
   remaining: number;
   date: string;
+  businessName: string;
+  logoData: string | null;
+  showBusinessLogo: boolean;
 }) {
   return (
     <section className="print-area overflow-hidden rounded-sm bg-white px-5 py-6 shadow-xl sm:px-8 lg:px-10 lg:py-8">
-      <div className="flex items-start justify-between">
-        <h2 className="text-3xl font-extrabold tracking-normal text-emerald-800 sm:text-5xl">INVOICE</h2>
-        <div className="text-right">
-          <div className="mb-2 text-2xl font-bold text-emerald-700 sm:text-4xl">|||||</div>
-          <p className="font-bold text-emerald-800">BIZMANAGER</p>
-          <p className="text-xs">BUSINESS SYSTEM</p>
-        </div>
-      </div>
-      <div className="mt-8 grid gap-6 text-sm sm:grid-cols-2 sm:gap-10">
+      <div className="grid gap-6 text-sm sm:grid-cols-2 sm:gap-10">
         <div className="space-y-5">
           <PreviewLine label="Invoice No." value={transactionNumber} />
           <PreviewLine label="Date" value={date.toUpperCase()} />
           <PreviewLine label="Payment Method" value={paymentMethod.toUpperCase()} />
         </div>
         <div className="border-t border-slate-300 pt-5 sm:border-l sm:border-t-0 sm:border-slate-900 sm:pl-10 sm:pt-0">
-          <PreviewLine label="Customer" value={customerName} />
-          <PreviewLine label="Address" value={address} />
-          <PreviewLine label="Telephone" value={phone} />
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-5">
+              <PreviewLine label="Customer" value={customerName} />
+              <PreviewLine label="Address" value={address} />
+              <PreviewLine label="Telephone" value={phone} />
+            </div>
+            {showBusinessLogo && logoData ? <img src={logoData} alt="Business logo" className="max-h-20 max-w-32 object-contain" /> : null}
+          </div>
         </div>
       </div>
       <div className="mt-8 overflow-x-auto border-t border-slate-900">
       <table className="w-full min-w-[430px] text-sm">
         <thead className="text-emerald-800">
           <tr>
-            <th className="py-4 text-left">Items</th>
+            <th className="py-4 text-left">Item Name</th>
             <th className="py-4 text-right">Qty.</th>
             <th className="py-4 text-right">Price</th>
             <th className="py-4 text-right">Total</th>
